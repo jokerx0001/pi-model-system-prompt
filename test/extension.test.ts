@@ -4,26 +4,64 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 
+import type {
+	BeforeAgentStartEvent,
+	BeforeAgentStartEventResult,
+	ExtensionAPI,
+	ExtensionContext,
+} from "@earendil-works/pi-coding-agent";
 import modelSystemPrompts from "../index.ts";
 
-/** Register the extension against a stub `pi` and hand back its handlers by event name. */
-function createHarness() {
-	const handlers = new Map();
-	modelSystemPrompts({ on: (name, handler) => handlers.set(name, handler) });
+/**
+ * The handler shape this suite drives. pi's own `ExtensionHandler` also admits an async handler,
+ * but this extension is synchronous, and the tests assert on the value it hands straight back.
+ * Event, context and result types all come from pi.
+ */
+type BeforeAgentStart = (
+	event: BeforeAgentStartEvent,
+	ctx: ExtensionContext,
+) => BeforeAgentStartEventResult | undefined;
+
+type Handlers = Map<string, BeforeAgentStart>;
+
+type PromptFixture = {
+	/** The `model-system-prompt` directory under this run's temporary HOME. */
+	dir: string;
+	handlers: Handlers;
+	write: (name: string, content: string) => void;
+};
+
+/**
+ * Register the extension against a stub `pi` and hand back its handlers by event name.
+ *
+ * The stub carries only the one API method the extension calls. Asserting it through `unknown`
+ * is the price of not fabricating the rest of `ExtensionAPI`; the context stub below is typed
+ * for real, which is where a wrong shape would actually bite.
+ */
+function createHarness(): Handlers {
+	const handlers: Handlers = new Map();
+	const pi = { on: (name: string, handler: BeforeAgentStart) => handlers.set(name, handler) } as unknown as ExtensionAPI;
+	modelSystemPrompts(pi);
 	return handlers;
 }
 
-// Mirrors the real ExtensionContext: the active model is the `model` property, not a method.
-// See ExtensionContext in pi's dist/core/extensions/types.d.ts.
-function createCtx(modelId) {
-	return { model: modelId === undefined ? undefined : { id: modelId } };
+/**
+ * The context the handler sees, derived from pi's own type: a member `ExtensionContext` does
+ * not have is a compile error here, instead of a stub the tests quietly agree with.
+ *
+ * `Partial` because the handler reads exactly one field. The real handler signature demands a
+ * whole `ExtensionContext`; `runBeforeAgentStart` widens this rather than both casting away the
+ * check and inventing the other seventeen members.
+ */
+function createCtx(modelId: string | undefined): Partial<ExtensionContext> {
+	return { model: modelId === undefined ? undefined : ({ id: modelId } as ExtensionContext["model"]) };
 }
 
-const runBeforeAgentStart = (handlers, { modelId, systemPrompt = "BASE" }) =>
-	handlers.get("before_agent_start")({ systemPrompt }, createCtx(modelId));
+const runBeforeAgentStart = (handlers: Handlers, { modelId, systemPrompt = "BASE" }: { modelId?: string; systemPrompt?: string }) =>
+	handlers.get("before_agent_start")!({ systemPrompt } as BeforeAgentStartEvent, createCtx(modelId) as ExtensionContext);
 
 /** Point homedir() at a temp dir holding the given `modelId.md` files. */
-function withPrompts(files, body) {
+function withPrompts(files: Record<string, string>, body: (fixture: PromptFixture) => void): void {
 	const home = mkdtempSync(join(tmpdir(), "model-system-prompts-"));
 	const dir = join(home, ".pi", "agent", "model-system-prompt");
 	mkdirSync(dir, { recursive: true });
@@ -117,23 +155,30 @@ test("reads the file fresh, so edits apply to the next run", () => {
 
 test("composes with another force-appending extension in either load order", () => {
 	// Stands in for any extension (ponytail today) that force-appends on every run.
-	const styleExtension = (pi) => pi.on("before_agent_start", (event) => ({ systemPrompt: `${event.systemPrompt} [STYLE]` }));
+	const styleExtension = (pi: ExtensionAPI) =>
+		pi.on("before_agent_start", (event: BeforeAgentStartEvent) => ({ systemPrompt: `${event.systemPrompt} [STYLE]` }));
 
 	for (const [first, expected] of [
 		// The later handler appends after the earlier one, so the interleaving follows load order.
 		["style", "BASE [STYLE]\n\n[MODEL]"],
 		["model", "BASE\n\n[MODEL] [STYLE]"],
-	]) {
+	] as const) {
 		const order = first === "style" ? ["style", "model"] : ["model", "style"];
 		withPrompts({ "glm-4.7-flash.md": "[MODEL]" }, ({ handlers }) => {
-			const styleHandlers = new Map();
-			styleExtension({ on: (name, handler) => styleHandlers.set(name, handler) });
+			const styleHandlers: Handlers = new Map();
+			styleExtension({ on: (name: string, handler: BeforeAgentStart) => styleHandlers.set(name, handler) } as unknown as ExtensionAPI);
 
-			const run = (name, event) =>
-				(name === "style" ? styleHandlers : handlers).get("before_agent_start")(event, createCtx("glm-4.7-flash"));
+			const run = (name: string, systemPrompt: string) =>
+				(name === "style" ? styleHandlers : handlers).get("before_agent_start")!(
+					{ systemPrompt } as BeforeAgentStartEvent,
+					createCtx("glm-4.7-flash") as ExtensionContext,
+				);
 
-			const step1 = run(order[0], { systemPrompt: "BASE" });
-			const step2 = run(order[1], { systemPrompt: step1.systemPrompt });
+			// Both stubs always hand back a result, always with a systemPrompt, so these `!`s are
+			// belt-and-braces rather than a live assumption: an undefined step fails the equality
+			// check below, legibly.
+			const step1 = run(order[0], "BASE")!;
+			const step2 = run(order[1], step1.systemPrompt!)!;
 			assert.equal(step2.systemPrompt, expected, `load order: ${order.join(" then ")}`);
 		});
 	}
