@@ -13,8 +13,10 @@ function createHarness() {
 	return handlers;
 }
 
+// Mirrors the real ExtensionContext: the active model is the `model` property, not a method.
+// See ExtensionContext in pi's dist/core/extensions/types.d.ts.
 function createCtx(modelId) {
-	return { getModel: () => (modelId === undefined ? undefined : { id: modelId }) };
+	return { model: modelId === undefined ? undefined : { id: modelId } };
 }
 
 const runBeforeAgentStart = (handlers, { modelId, systemPrompt = "BASE" }) =>
@@ -46,6 +48,20 @@ test("appends the active model's file after the rendered prompt", () => {
 	withPrompts({ "glm-4.7-flash.md": "Be terse." }, ({ handlers }) => {
 		const result = runBeforeAgentStart(handlers, { modelId: "glm-4.7-flash" });
 		assert.equal(result?.systemPrompt, "BASE\n\nBe terse.");
+	});
+});
+
+test("delivers the file body whole: interior bytes reach the prompt unaltered", () => {
+	// 40 blank-line-separated rules, each indented, so any truncation, reflow or re-indenting
+	// shows up as a diff. The first line is unindented: the extension trims the file, so blank
+	// edges are not content.
+	const body = Array.from({ length: 40 }, (_, i) => `rule ${i}: keep the code boring.`)
+		.map((line, i) => (i === 0 ? line : `  ${line}`))
+		.join("\n\n");
+
+	withPrompts({ "glm-4.7-flash.md": body }, ({ handlers }) => {
+		const result = runBeforeAgentStart(handlers, { modelId: "glm-4.7-flash" });
+		assert.equal(result?.systemPrompt, `BASE\n\n${body}`);
 	});
 });
 

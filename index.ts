@@ -25,7 +25,9 @@ function promptsDir(): string {
 
 export default function modelSystemPrompts(pi: ExtensionAPI) {
 	pi.on("before_agent_start", (event, ctx) => {
-		const modelId = ctx.getModel()?.id;
+		// `ctx.model`, not `ctx.getModel()`: on the real ExtensionContext the active model is a
+		// property. Reading it per run is what makes a mid-session model switch take effect.
+		const modelId = ctx.model?.id;
 		if (!modelId) return;
 
 		const file = join(promptsDir(), `${modelId}.md`);
