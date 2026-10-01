@@ -92,6 +92,15 @@ test("returns nothing for an empty or whitespace-only file", () => {
 	});
 });
 
+test("returns nothing when the prompt cannot be read", () => {
+	withPrompts({}, ({ dir, handlers }) => {
+		// A directory where the file should be: readFileSync throws EISDIR, standing in for any
+		// unreadable-file case (permissions, wrong type) on a platform where chmod is a no-op.
+		mkdirSync(join(dir, "glm-4.7-flash.md"));
+		assert.equal(runBeforeAgentStart(handlers, { modelId: "glm-4.7-flash" }), undefined);
+	});
+});
+
 test("returns nothing when no model is selected", () => {
 	withPrompts({ "glm-4.7-flash.md": "Be terse." }, ({ handlers }) => {
 		assert.equal(runBeforeAgentStart(handlers, { modelId: undefined }), undefined);

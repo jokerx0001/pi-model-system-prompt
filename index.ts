@@ -33,7 +33,15 @@ export default function modelSystemPrompts(pi: ExtensionAPI) {
 		const file = join(promptsDir(), `${modelId}.md`);
 		if (!existsSync(file)) return;
 
-		const text = readFileSync(file, "utf8").trim();
+		// Unreadable is a no-op like every other form of absence, not an error: a permissions
+		// slip on the user's side must not break their run.
+		let text: string;
+		try {
+			text = readFileSync(file, "utf8");
+		} catch {
+			return;
+		}
+		text = text.trim();
 		if (!text) return;
 
 		return { systemPrompt: `${event.systemPrompt}\n\n${text}` };
