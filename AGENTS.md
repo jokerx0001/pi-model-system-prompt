@@ -19,6 +19,21 @@ Already installed as a local path package (`pi install .` writes the path into
 `~/.pi/agent/settings.json`; pi loads it from this directory without copying, so edits here
 take effect after `/reload`).
 
+## Development
+
+`npm test` runs the handler tests and needs nothing installed. `npm run check` adds a typecheck
+and needs the toolchain linked once:
+
+```sh
+npm install
+npm link @earendil-works/pi-coding-agent   # types come from the installed pi, not a dep
+npm run check
+```
+
+The link step is not optional and not recorded in `package.json`: `index.ts` imports
+`ExtensionAPI` from pi, so without it `tsc` cannot resolve the module. Linking the globally
+installed pi also means the typecheck follows the host that actually loads this extension.
+
 ## Agent skills
 
 ### Issue tracker
