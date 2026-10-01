@@ -70,6 +70,12 @@ And, from code review: `readFileSync` was unguarded, so an unreadable file threw
 without changing the prompt" (story 11), so the read is now guarded. The test uses a directory
 where the file should be, because that raises EISDIR portably where Windows `chmod` does not.
 
+The `getModel()` bug had a cheap guard available the whole time and it was not taken: a typecheck
+reports it in one line (`TS2339: Property 'getModel' does not exist on type 'ExtensionContext'`).
+`npm run check` now runs it against the installed pi. Worth remembering for the remaining
+tickets — the stub invented a shape the type system already knew was wrong, and a test written
+against that stub would have kept agreeing with it.
+
 One deliberate sharp edge, since the criterion says "not reformatted": the handler `trim()`s the
 file. Leading and trailing whitespace is not preserved, and on a file whose *first* line is
 indented that indent is lost. `trim()` is what makes a whitespace-only file behave as no file,
