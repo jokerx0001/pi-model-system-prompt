@@ -4,6 +4,7 @@
 		"module": "preserve",
 		"moduleResolution": "bundler",
 		"allowImportingTsExtensions": true,
+		"allowJs": true,
 		"verbatimModuleSyntax": true,
 		"strict": true,
 		"noEmit": true,

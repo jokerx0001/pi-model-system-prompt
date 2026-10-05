@@ -6,20 +6,32 @@ A pi extension that appends a per-model system prompt, chosen by the active mode
 
 - `index.ts` — the extension. Reads `~/.pi/agent/model-system-prompt/<modelId>.md` and appends it
   to the system prompt on every run. No file means no injection.
+- `install-presets.mjs` — `npm run install-presets`. Copies `presets/*.md` into the user's prompt
+  directory. Never overwrites; deleting a preset is how you get rid of it.
+- `presets/` — ready-made prompts this project ships.
 - `test/extension.test.ts` — `npm test`. Typed, and the stub context is derived from pi's own
   `ExtensionContext`, so a member pi does not have is a compile error rather than a shape the
   tests quietly agree with.
 - `.scratch/` — issues and specs
 - `docs/agents/` — issue tracker, triage labels, domain doc conventions
 
-Prompt files are user data and live in `~/.pi/agent/model-system-prompt/`, not in this repo. Code
-lives here; the text you write does not.
+The extension only ever reads `~/.pi/agent/model-system-prompt/`. Once a preset is copied there it
+is indistinguishable from a file the user wrote: the user edits it, or deletes it to turn that
+model off, and the extension behaves the same either way. There is no manifest and no state file
+— what is on disk is the truth. Code and versioned prompt text live here; the *active* prompt for
+a given model is whatever the user has in their own directory.
 
 ## Install
 
-Already installed as a local path package (`pi install .` writes the path into
-`~/.pi/agent/settings.json`; pi loads it from this directory without copying, so edits here
-take effect after `/reload`).
+```sh
+pi install .        # records this path in ~/.pi/agent/settings.json
+npm run install-presets   # copies presets/*.md into ~/.pi/agent/model-system-prompt/
+```
+
+Two steps because `pi install .` only records the path; it runs no npm lifecycle, so a
+`postinstall` hook would never fire on it. The presets step is explicit on purpose: an automatic
+hook would also fire on every later `npm install` and put back a preset the user deleted, and
+deleting the file is the only off switch this extension has.
 
 ## Development
 
