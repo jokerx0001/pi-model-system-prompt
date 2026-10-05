@@ -1,12 +1,30 @@
 {
-  "name": "model-system-prompts",
-  "private": true,
+  "name": "pi-model-system-prompt",
+  "version": "0.1.0",
+  "description": "Per-model system prompt for pi: appends the prompt file named after the active model id",
   "type": "module",
+  "keywords": [
+    "pi-package"
+  ],
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ]
+  },
+  "files": [
+    "index.ts",
+    "install-presets.mjs",
+    "presets"
+  ],
   "scripts": {
     "test": "node --test ./test/*.test.ts",
     "install-presets": "node install-presets.mjs",
+    "postinstall": "node install-presets.mjs",
     "typecheck": "tsc --noEmit",
     "check": "npm run typecheck && npm test"
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-coding-agent": "*"
   },
   "devDependencies": {
     "typescript": "^7.0.2"

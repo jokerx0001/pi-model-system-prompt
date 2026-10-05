@@ -6,10 +6,12 @@ A pi extension that appends a per-model system prompt, chosen by the active mode
 
 - `index.ts` — the extension. Reads `~/.pi/agent/model-system-prompt/<modelId>.md` and appends it
   to the system prompt on every run. No file means no injection.
-- `install-presets.mjs` — `npm run install-presets`. Copies `presets/*.md` into the user's prompt
-  directory. Never overwrites; deleting a preset is how you get rid of it.
+- `install-presets.mjs` — the package's `postinstall` hook, and `npm run install-presets` for a dev
+  checkout. Copies `presets/*.md` into the user's prompt directory. Never overwrites; deleting a
+  preset is how you get rid of it.
 - `presets/` — ready-made prompts this project ships.
-- `test/extension.test.ts` — `npm test`. Typed, and the stub context is derived from pi's own
+- `test/` — `npm test`. The handler tests plus the seeding tests, one of which installs the packed
+  package with the real `pi` CLI. Typed, and the stub context is derived from pi's own
   `ExtensionContext`, so a member pi does not have is a compile error rather than a shape the
   tests quietly agree with.
 - `.scratch/` — issues and specs
@@ -23,20 +25,37 @@ a given model is whatever the user has in their own directory.
 
 ## Install
 
+Users install the published package — one command:
+
 ```sh
-pi install .        # records this path in ~/.pi/agent/settings.json
-npm run install-presets   # copies presets/*.md into ~/.pi/agent/model-system-prompt/
+pi install npm:pi-model-system-prompt
 ```
 
-Two steps because `pi install .` only records the path; it runs no npm lifecycle, so a
-`postinstall` hook would never fire on it. The presets step is explicit on purpose: an automatic
-hook would also fire on every later `npm install` and put back a preset the user deleted, and
-deleting the file is the only off switch this extension has.
+pi installs the package with npm, and the package's `postinstall` hook copies `presets/*.md` into
+`~/.pi/agent/model-system-prompt/`. The hook never overwrites a file that is already there, and npm
+runs it once per installed version and leaves an already-satisfied dependency alone — so a preset the
+user deleted is not put back by a later `pi install` of anything else, nor by re-running the same
+install. Deleting the file remains the only off switch, and there is no state file of ours; the
+install-once guarantee is npm's own.
+
+Publishing is a manual one-time step: `npm publish`, targeting the public registry explicitly
+(this machine's npm registry is a mirror).
+
+For development, install the project path and seed by hand:
+
+```sh
+pi install .              # records this path in ~/.pi/agent/settings.json
+npm run install-presets   # the same script the hook runs
+```
+
+A dev checkout is loaded from source, so editing and reloading needs no reinstall. A plain
+`npm install` in the checkout also runs the `postinstall` hook — npm runs the root project's own
+hook — so it re-seeds a preset deleted from the developer's own home directory.
 
 ## Development
 
-`npm test` runs the handler tests and needs nothing installed. `npm run check` adds a typecheck
-and needs the toolchain linked once:
+`npm test` runs the handler tests and needs nothing installed; the packaged-install test skips if
+the `pi` CLI is not on PATH. `npm run check` adds a typecheck and needs the toolchain linked once:
 
 ```sh
 npm install

@@ -1,10 +1,14 @@
 /**
  * Copies the shipped presets into the user's prompt directory.
  *
- * `pi install .` only records the project path, so this cannot ride along as an npm lifecycle
- * script — it is an explicit `npm run install-presets` instead. Deliberate: a postinstall hook
- * would also fire on any later `npm install` and put back a preset the user deleted, and deleting
- * the file is how a user turns a model off.
+ * Two callers, one behaviour:
+ *   - the package's `postinstall` hook, so that `pi install npm:pi-model-system-prompt` is the whole
+ *     of install: pi runs npm install for the package and npm runs this. npm runs it once per
+ *     installed version, and an already-satisfied dependency is left alone, so a preset the user
+ *     deleted is not put back by a later install.
+ *   - `npm run install-presets`, for a dev checkout, which pi loads from source and npm never
+ *     installs. A plain `npm install` in the checkout also runs the hook, since npm runs the root
+ *     project's own postinstall.
  *
  * A file already in the target directory is the user's, whether or not they edited it, so it is
  * never overwritten. There is no manifest and no state file: what is on disk is the truth.
@@ -24,6 +28,10 @@ export const targetDir = () => join(homedir(), ".pi", "agent", "model-system-pro
  * @returns {{ copied: string[], skipped: string[] }} the basenames, sorted
  */
 export function installPresets(target = targetDir(), presets = join(HERE, "presets")) {
+	// A package without its presets is not an install failure: seeding nothing is a no-op, and a
+	// postinstall that throws would fail the user's whole `pi install`.
+	if (!existsSync(presets)) return { copied: [], skipped: [] };
+
 	mkdirSync(target, { recursive: true });
 
 	const names = readdirSync(presets)

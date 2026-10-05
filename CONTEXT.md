@@ -21,6 +21,7 @@ The whole instruction text pi assembles for a run. The extension only ever appen
 _Avoid_: preset, prompt file
 
 **Install**:
-Two steps: pi records the package, then the presets are copied into the user's prompt directory.
-After the copy a preset is a prompt file, indistinguishable from one the user wrote.
-_Avoid_: setup
+One command, `pi install npm:pi-model-system-prompt`: pi installs the package, and the package's own
+npm install lifecycle copies the presets into the user's prompt directory. After the copy a preset
+is a prompt file, indistinguishable from one the user wrote.
+_Avoid_: setup, two steps
