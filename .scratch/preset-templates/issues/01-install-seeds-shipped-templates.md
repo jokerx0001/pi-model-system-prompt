@@ -248,3 +248,35 @@ close this box. The packaging is otherwise proven — the same tarball installs 
 - **Two stale copies of the old package name, fixed.** The rename left `index.ts`'s header comment
   and `package-lock.json` still saying `model-system-prompts`. Both are artifacts of this ticket's own
   rename, so they were corrected rather than left as drift.
+
+### Why a project-wide doc changed under this ticket
+
+A review of this ticket asked for `done` to be reconciled with
+`docs/agents/triage-labels.md`, which listed only the five skills roles while this ticket and issue
+04 both use `done`. The fix was a `done` row in that table — but that left the two standards sources
+disagreeing, because AGENTS.md's "Triage labels" section still said "Five canonical roles, label
+string equals role name." So AGENTS.md now reads: five skills roles with the label string equal to the
+role name, plus `done`, this repo's own workflow state for implemented and verified work, which has no
+skills equivalent. That is a one-line doc edit outside the seeding code, made here only because the
+`done` row was requested in review and AGENTS.md is what a contributor reads first.
+
+### Residual items, seen and deliberately left
+
+Each was looked at and left alone, not missed:
+
+- **README heading vs project name.** README says `# pi-model-system-prompt`, AGENTS.md and
+  CONTEXT.md say `# model-system-prompt`. Left: they name different things (npm package vs project),
+  and collapsing them would contradict `spec.md` or make the README misname the package.
+- **`.scratch/preset-templates/` uses "template", which CONTEXT.md's Avoid-list reserves.** Left,
+  but with a correction to the usual framing: the slug and the Avoid-list entry landed in the *same*
+  commit `27c2899` (2026-10-05), the one that created the directory, so neither predates the other.
+  What is true is that both predate this ticket's implementation work, so the collision is
+  pre-existing rather than introduced here, and the slug is not one of this ticket's decisions.
+- **`.pi/agent/model-system-prompt` is written out literally in two test files** (three call sites:
+  `extension.test.ts`, and twice in `install-presets.test.ts`). Left: this round is doc-only, and
+  the two files are the two halves under test — the handler that reads the path and the script that
+  seeds it — so each asserts the literal path rather than sharing a constant. Collapsing them is a
+  reasonable follow-up, not a blocker.
+- **The e2e test takes about 12s.** Left: it drives the real `pi` CLI through five installs plus two
+  `npm pack` runs, so the time is the CLI's, not the test's. It skips when `pi` is not on PATH, which
+  keeps `npm test` fast for a contributor who has not installed pi.

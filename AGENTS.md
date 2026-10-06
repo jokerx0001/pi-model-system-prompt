@@ -80,7 +80,9 @@ Issues and specs live as markdown under `.scratch/`. See `docs/agents/issue-trac
 
 ### Triage labels
 
-Five canonical roles, label string equals role name. See `docs/agents/triage-labels.md`.
+Five skills roles, label string equals role name, plus `done` — this repo's own workflow state for
+work that is implemented and verified, which has no skills equivalent. See
+`docs/agents/triage-labels.md`.
 
 ### Domain docs
 
