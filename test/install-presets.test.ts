@@ -87,8 +87,7 @@ test("the dev command seeds a fresh home directory through the real entry point"
 	// USERPROFILE is what os.homedir() reads on win32, HOME everywhere else: set both, and point
 	// them at a temp dir so this test cannot write into the developer's real home directory.
 	const fakeHome = mkdtempSync(join(tmpdir(), "install-presets-home-"));
-	const name = PRESET;
-	const seeded = join(fakeHome, ".pi", "agent", "model-system-prompt", name);
+	const seeded = join(fakeHome, ".pi", "agent", "model-system-prompt", PRESET);
 	try {
 		const run = spawnSync(process.execPath, ["install-presets.mjs"], {
 			cwd: join(import.meta.dirname, ".."),
@@ -97,11 +96,11 @@ test("the dev command seeds a fresh home directory through the real entry point"
 		});
 
 		assert.equal(run.status, 0, run.stderr);
-		assert.match(run.stdout, /installed\s+MiniMax-M3\.1-Flash-Preview\.md/);
+		assert.match(run.stdout, new RegExp(`installed\\s+${PRESET.replace(/\./g, "\\.")}`));
 		assert.equal(existsSync(seeded), true, "the preset landed in the redirected home");
 		assert.deepEqual(
 			readFileSync(seeded),
-			readFileSync(join(import.meta.dirname, "..", "presets", name)),
+			readFileSync(join(import.meta.dirname, "..", "presets", PRESET)),
 		);
 	} finally {
 		rmSync(fakeHome, { recursive: true, force: true });
@@ -125,26 +124,33 @@ test("the documented install seeds the preset through the packaged postinstall h
 	const agent = join(root, "agent");
 	const packs = join(root, "packs");
 	mkdirSync(packs, { recursive: true });
-	const name = PRESET;
-	const shipped = join(repo, "presets", name);
-	const seeded = join(home, ".pi", "agent", "model-system-prompt", name);
+	const shipped = join(repo, "presets", PRESET);
+	const seeded = join(home, ".pi", "agent", "model-system-prompt", PRESET);
 	// Both directories are redirected: os.homedir() reads USERPROFILE on win32, HOME elsewhere.
 	const env = { ...process.env, HOME: home, USERPROFILE: home, PI_CODING_AGENT_DIR: agent };
+
 	// `npm:<name>@file:<tarball>` rather than a bare tarball path, and forward slashes inside the
 	// file: URL. Under the bare form pi installs the package and runs the hook but never discovers
 	// the extension; the named form is also the shape the documented command uses. See the ticket.
-	const spec = (pkg: string, file: string) => `npm:${pkg}@file:${file.replace(/\\/g, "/")}`;
-	const pack = (dir: string, pkg: string) => {
+	const npmSpec = (pkg: string, tarball: string) => `npm:${pkg}@file:${tarball.replace(/\\/g, "/")}`;
+	/** Pack `dir` into the temp pack directory and return the spec that installs that tarball. */
+	const packIntoSpec = (dir: string, pkg: string) => {
 		const out = run(`npm pack --json --pack-destination "${packs}"`, { cwd: dir });
 		assert.equal(out.status, 0, out.stderr);
-		return spec(pkg, join(packs, JSON.parse(out.stdout)[0].filename));
+		return npmSpec(pkg, join(packs, JSON.parse(out.stdout)[0].filename));
 	};
+	const installSpec = (spec: string) => {
+		const out = run(`pi install "${spec}"`, { env });
+		assert.equal(out.status, 0, out.stderr);
+	};
+	const assertSeeded = (why: string) => assert.deepEqual(readFileSync(seeded), readFileSync(shipped), why);
+	const assertNotSeeded = (why: string) => assert.equal(existsSync(seeded), false, why);
 
 	try {
-		const ours = pack(repo, "pi-model-system-prompt");
+		const oursSpec = packIntoSpec(repo, "pi-model-system-prompt");
 
-		// A package with a different name, so installing it exercises npm's tree rather than a
-		// re-run of our own hook. It is a real pi package so pi accepts it.
+		// A second package under a different name, so installing it exercises npm's tree rather
+		// than a re-run of our own hook. A real minimal pi package, so pi accepts the install.
 		const otherDir = join(root, "unrelated");
 		mkdirSync(otherDir, { recursive: true });
 		writeFileSync(join(otherDir, "package.json"), JSON.stringify({
@@ -155,22 +161,14 @@ test("the documented install seeds the preset through the packaged postinstall h
 			files: ["index.ts"],
 		}));
 		writeFileSync(join(otherDir, "index.ts"), "export default function noop() {}\n");
-		const other = pack(otherDir, "pi-unrelated-noop");
+		const otherSpec = packIntoSpec(otherDir, "pi-unrelated-noop");
 
-		const install = (spec_: string) => {
-			const out = run(`pi install "${spec_}"`, { env });
-			assert.equal(out.status, 0, out.stderr);
-		};
+		// One command: it installs the extension and seeds the preset.
+		installSpec(oursSpec);
+		assertSeeded("one pi install landed the preset in the redirected home");
 
-		install(ours);
-		assert.deepEqual(
-			readFileSync(seeded),
-			readFileSync(shipped),
-			"one pi install landed the preset in the redirected home",
-		);
-
-		// The extension pi installed is a copy in its npm tree, and pi itself is a peer that npm
-		// did not install, so the tree carries no second copy of it.
+		// The extension is a copy in pi's npm tree, and pi itself is a peer that was not installed
+		// there, so the tree carries no second copy of it.
 		assert.equal(existsSync(join(agent, "npm", "node_modules", "pi-model-system-prompt", "index.ts")), true);
 		assert.equal(
 			existsSync(join(agent, "npm", "node_modules", "@earendil-works")),
@@ -178,18 +176,24 @@ test("the documented install seeds the preset through the packaged postinstall h
 			"the peer pi was not installed into the managed tree",
 		);
 
-		// Installing twice in a row changes nothing the second time.
-		install(ours);
-		assert.deepEqual(readFileSync(seeded), readFileSync(shipped), "a second install changed nothing");
+		// Criterion 10: installing twice in a row changes nothing the second time.
+		installSpec(oursSpec);
+		assertSeeded("a second install changed nothing");
 
-		// Nor does installing a different package, which is the case a re-run of our hook would break.
-		install(other);
-		assert.deepEqual(readFileSync(seeded), readFileSync(shipped), "installing another package changed nothing");
+		// Installing an unrelated package leaves a file the user already has alone. This does not
+		// cover a deleted preset: a re-run hook skips a file that is still there, so it would pass
+		// either way. The deletion case below is the one that carries that half of criterion 11.
+		installSpec(otherSpec);
+		assertSeeded("installing another package changed nothing");
 
-		// Deleting a preset is how a model is turned off; installing again must not undo it.
+		// Criterion 11. The preset is gone before the next two installs, so a hook that ran on
+		// either of them would put it back and fail here. A present-and-unmodified file cannot
+		// distinguish "the hook did not run" from "the hook ran and skipped an existing file".
 		rmSync(seeded);
-		install(ours);
-		assert.equal(existsSync(seeded), false, "a deleted preset stayed deleted");
+		installSpec(otherSpec);
+		assertNotSeeded("installing another package did not bring a deleted preset back");
+		installSpec(oursSpec);
+		assertNotSeeded("re-installing the same package did not bring a deleted preset back");
 	} finally {
 		rmSync(root, { recursive: true, force: true });
 	}

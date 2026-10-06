@@ -40,9 +40,10 @@ file the user owns: editable, and deletable to turn that model off.
 - [x] Development is unchanged: the project still installs as a local-path package that pi loads from
       source, editable and reloadable, with the seeding script still runnable by hand on a dev machine
 - [x] The seeding behaviour is covered by an automated check that exercises the packaged artifact the
-      way a user installs it: pack the package, run the real `pi install npm:<tarball>` with the agent
-      directory *and* the home directory redirected to temporary locations, and assert the preset
-      lands in the redirected prompt directory and the command exits 0
+      way a user installs it: pack the package, then run the real
+      `pi install npm:<name>@file:<tarball>` with the agent directory *and* the home directory
+      redirected to temporary locations, and assert the preset lands in the redirected prompt
+      directory and the command exits 0
 - [x] The project's own documentation — the agent instructions and the domain model's definition of
       "Install" — describes install as that single command, not as two steps
 
@@ -94,10 +95,11 @@ npm pack --json --pack-destination "$TMP/packs"          # from the repo
 pi install "npm:pi-model-system-prompt@file:$TMP/packs/pi-model-system-prompt-0.1.0.tgz"
 ```
 
-Probe (`$PI_CODING_AGENT_DIR` = the temp agent dir):
+Probe (`$PI_CODING_AGENT_DIR` = the temp agent dir). `piDir` is pi's own install, which on this
+machine `npm root -g` resolves to `C:\Users\joker\AppData\Roaming\npm\node_modules`:
 
 ```js
-const piDir = "<npm global root>/node_modules/@earendil-works/pi-coding-agent";
+const piDir = "C:/Users/joker/AppData/Roaming/npm/node_modules/@earendil-works/pi-coding-agent";
 const { DefaultResourceLoader } = await import(`file:///${piDir}/dist/core/resource-loader.js`);
 const loader = new DefaultResourceLoader({ cwd: process.cwd(), agentDir: process.env.PI_CODING_AGENT_DIR });
 await loader.reload();
@@ -153,20 +155,43 @@ appears in the managed tree.
 
 ### Criteria 10 and 11 — idempotence, and deletion surviving other installs
 
-Both are now in the e2e test, which runs this sequence against the real CLI with `HOME`, `USERPROFILE`
+Both are in the e2e test, which runs this sequence against the real CLI with `HOME`, `USERPROFILE`
 and `PI_CODING_AGENT_DIR` all redirected to temp dirs and the tarballs packed into a temp dir:
 
 1. `pi install` our package — asserts the preset is byte-identical to `presets/`.
 2. Asserts the copy landed in the agent npm tree and that no `@earendil-works` was installed there.
 3. **Criterion 10:** `pi install` our package again with the preset present — asserts it is still
    byte-identical. This is the literal back-to-back case, separate from the deletion case.
-4. **Criterion 11, first half:** `pi install` a second, unrelated package (`pi-unrelated-noop`, a
-   real minimal pi package packed from a temp dir) — asserts the preset is still byte-identical.
-5. **Criterion 11, second half:** delete the preset, `pi install` our package again — asserts it is
-   still gone.
+4. `pi install` a second, unrelated package (`pi-unrelated-noop`, a real minimal pi package packed
+   from a temp dir) with the preset **present** — asserts it is still byte-identical. This one
+   covers the "never overwrites a file the user already has" property under another package's
+   install. It does **not** cover criterion 11: a re-run hook skips a file that is still there, so
+   this assertion would pass whether the hook ran or not.
+5. **Criterion 11, both halves — the discriminating part.** The preset is deleted *first*, so
+   there is nothing for a re-run hook to skip:
+   - `pi install` the unrelated package — asserts the preset is **still absent**. This is the half
+     that was missing, and the only assertion in the test that can distinguish "the hook did not
+     run" from "the hook ran and did its job".
+   - `pi install` our package again — asserts still absent. This is the re-run-same-install half.
 
-The test is not vacuous: with `postinstall` removed from `package.json` it fails on the first
-assertion, and passes again once restored. Full run is about 10s, and it skips if `pi` is not on PATH.
+   The two assertions have teeth because step 1 already proves the hook recreates a missing preset:
+   the hook copies whenever the file is absent. So if either post-deletion install had re-run it,
+   the file would exist and the assertion would fail. The guarantee under test is npm's
+   already-satisfied-dependency behaviour, not the hook's.
+
+**The test detects a broken hook.** A copy of the repo with `postinstall` deleted from its
+`package.json` (done in a temp copy, not in the working tree) fails the e2e:
+
+```
+✖ the documented install seeds the preset through the packaged postinstall hook
+  Error: ENOENT: no such file or directory, open
+  'C:\Users\joker\AppData\Local\Temp\install-presets-npm-Lq3pfZ\home\.pi\agent\model-system-prompt\MiniMax-M3.1-Flash-Preview.md'
+ℹ pass 6
+ℹ fail 1
+```
+
+The six unit tests still pass in that copy, because they call `installPresets()` directly and do not
+depend on the lifecycle. Full e2e run is about 11s, and it skips if `pi` is not on PATH.
 
 ### Criterion 6 — not met, deliberately unticked
 
@@ -196,13 +221,30 @@ close this box. The packaging is otherwise proven — the same tarball installs 
   installing `pi install npm:pi-model-system-prompt` actually lands on. Criterion 2 asks for install
   to be documented as one command; that is not satisfied by AGENTS.md, which no npm visitor reads.
   It is four lines: what it does, the one command, and the prompt-file path.
-- **Duplicate preset filename in the test — fixed.** The shipped filename was a literal in three
-  places; it is now one `PRESET` constant, so a rename is a one-line change.
-- **Project name differing across docs — left as is, deliberately.** The two names are different
-  things: `pi-model-system-prompt` is the npm package name, and `model-system-prompt` is the project
-  name used by `spec.md` (untouched), the repo directory, and therefore AGENTS.md and CONTEXT.md. The
-  README heading carries the package name because that is what npm renders and what users type.
-  Collapsing them would either contradict `spec.md` or make the README lie about the package.
+- **Duplicate preset filename in the test — fixed, and now genuinely single-sourced.** The shipped
+  filename was a literal in four places, including a regex with hand-escaped dots, so the earlier
+  claim that a rename is a one-line change was false. It is now the single `PRESET` constant: three
+  sites join a path from it, and the dev-command assertion builds its regex from it with
+  `PRESET.replace(/\./g, "\\.")`. A rename is now a one-line change, as claimed.
+- **Test helper naming in the e2e.** `install(spec_)` existed only to avoid reading as a second
+  `spec`, and `spec`/`pack` under-described what they did. Renamed to say what each does:
+  `npmSpec(pkg, tarball)` builds an install spec, `packIntoSpec(dir, pkg)` packs a directory and
+  returns that spec, `installSpec(spec)` runs the real CLI with it. The three repeated
+  `assert.deepEqual(readFileSync(seeded), readFileSync(shipped), ...)` calls and the two absence
+  assertions are now `assertSeeded(why)` and `assertNotSeeded(why)`.
+- **`done` added to the triage table.** `Status: done` was outside the five role strings in
+  `docs/agents/triage-labels.md`. Stopping its use was not an option — issue 04 already used it and
+  is out of scope here — so the table gained a `done` row, with the left column marked as having no
+  skills equivalent since `done` is a workflow state rather than a triage role.
+- **Project name differing across docs — left as is, deliberately, and unchanged this round.** The
+  two names are different things: `pi-model-system-prompt` is the npm package name, and
+  `model-system-prompt` is the project name used by `spec.md` (untouched), the repo directory, and
+  therefore AGENTS.md and CONTEXT.md. The README heading carries the package name because that is
+  what npm renders and what users type. Collapsing them would either contradict `spec.md` or make the
+  README lie about the package.
+- **`.scratch/preset-templates/` naming — left, and confirmed left.** The directory name predates
+  this ticket and is not one of its decisions, so it stays as found; nothing in this change reads it
+  as a spec template.
 - **Two stale copies of the old package name, fixed.** The rename left `index.ts`'s header comment
   and `package-lock.json` still saying `model-system-prompts`. Both are artifacts of this ticket's own
   rename, so they were corrected rather than left as drift.
