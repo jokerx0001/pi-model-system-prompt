@@ -21,51 +21,24 @@ pi install npm:pi-model-system-prompt
 
 装完重启 Pi。
 
+## 快速开始
+安装完毕后自动生效。根据当前选择的model，只要~/.pi/agent/model-system-prompt/目录下存在与当前model同名的md文件，那么该文件内容就被当作此model的特定系统提示词，插件会将它加入pi agent的系统提示词中。
+
+需要自己写特定模型的系统提示词时，只需要在~/.pi/agent/model-system-prompt/目录下添加model同名md文件，并在文件中编写即可。打开pi时会自动加载。
+
+插件提供优质的预置提示词。注意，由于开源模型存在不同精度和微调，所以预置提示词的调校均基于各自的官方模型，不对非官方模型效果做保证。鼓励用户根据自己使用的模型自己调控系统提示词。
+
+预置系统提示词的模型列表
+* MiniMax-M3
+* MiniMax-M3.1-Flash-Preview
+* deepseek-flash
+* glm-5.3-flash
+* glm-5.3
+* kimi-k3
+
 ## 首次运行会发生什么
 
 | 你已经有… | 会发生什么 |
 | --- | --- |
-| 什么都没有 | `MiniMax-M3.1-Flash-Preview.md` 被复制进 `~/.pi/agent/model-system-prompt/`。其余模型完全不受影响。 |
-| 自己写的 `<modelId>.md` | 一律不动。目录里已经存在的文件就是你的，不管你改过没有。 |
-| 删掉过的预设 | 之后的安装不会把它放回来：npm 不会为已安装的版本重跑某个包的安装钩子。但彻底重装（删掉 `node_modules` 再装）或本包出新版本时，会重新写入。 |
-
-## 一个模型如何拿到它的提示词
-
-一条规则，每次运行都重新求值：
-
-```
-~/.pi/agent/model-system-prompt/<modelId>.md
-```
-
-- `<modelId>` 就是 model id 本身——`MiniMax-M3.1-Flash-Preview`，不带 provider 前缀。同一个文件
-  跟着模型走，无论哪个 provider 提供它。
-- 文件每次都重新读取，所以改完下一条消息就生效，不需要 `/reload`。
-- 内容追加到 pi 已经组装好的 system prompt 末尾，因此 harness 默认内容、你的 `SYSTEM.md`、你的
-  项目指令，以及其他扩展追加的内容都会保留。
-- 任何形式的「没有」都是无操作：文件不存在、内容为空、全是空白、或者你读不到它，system prompt
-  都保持原样。
-
-| 你想… | 就这么做 |
-| --- | --- |
-| 给某个模型加指引 | 新建 `~/.pi/agent/model-system-prompt/<modelId>.md` |
-| 关掉某个模型 | 删掉它的文件 |
-| 改模型收到的内容 | 编辑它的文件——下一条消息就用新内容 |
-| 关掉但保留文字 | 把文件清空 |
-
-## 提示词文本从哪来
-
-`presets/` 随包附带一份提示词：`MiniMax-M3.1-Flash-Preview.md`。安装时把它复制到上面的目录，
-从那一刻起它就是一份普通的提示词文件：你可以编辑，也可以删掉来关掉这个模型，扩展对两者行为一致。
-没有 manifest，也没有状态文件——磁盘上有什么就是什么。
-
-## 开发
-
-```sh
-pi install .              # 把这个路径记进 ~/.pi/agent/settings.json
-npm run install-presets   # 与 postinstall 钩子跑的是同一个脚本
-npm test
-```
-
-开发检出是从源码加载的，所以改完重新加载即可，不需要重装。`npm run check` 会额外跑类型检查；
-它需要先链接一次工具链：`npm link @earendil-works/pi-coding-agent`，因为类型来自已安装的 pi，
-而不是某个依赖。
+| 什么都没有 | 预置模型系统提示词被复制进 `~/.pi/agent/model-system-prompt/`。 |
+| 自己写的 `~/.pi/agent/model-system-prompt/<modelId>.md` | 一律不动。 |
