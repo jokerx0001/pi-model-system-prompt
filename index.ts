@@ -1,5 +1,5 @@
 /**
- * model-system-prompts
+ * pi-model-system-prompt
  *
  * Appends a per-model system prompt to every run. The text for the active model is
  * read from ~/.pi/agent/model-system-prompt/<modelId>.md; no file means no injection.

@@ -7,6 +7,9 @@ import test from "node:test";
 
 import { installPresets } from "../install-presets.mjs";
 
+/** The one preset this project ships. Named here so a rename is a one-line change. */
+const PRESET = "MiniMax-M3.1-Flash-Preview.md";
+
 /** A temp stand-in for `presets/`, plus a temp stand-in for the user's prompt directory. */
 function withDirs(body: (dirs: { presets: string; target: string; put: (name: string, content: string) => void }) => void) {
 	const root = mkdtempSync(join(tmpdir(), "install-presets-"));
@@ -69,7 +72,7 @@ test("installing twice is idempotent, and the shipped preset is a real file", ()
 		assert.equal(readFileSync(join(target, "m.md"), "utf8"), "PRESET BODY");
 	});
 
-	const shipped = join(import.meta.dirname, "..", "presets", "MiniMax-M3.1-Flash-Preview.md");
+	const shipped = join(import.meta.dirname, "..", "presets", PRESET);
 	assert.equal(existsSync(shipped), true, "the preset is in the repo, not only in the user directory");
 });
 
@@ -84,7 +87,7 @@ test("the dev command seeds a fresh home directory through the real entry point"
 	// USERPROFILE is what os.homedir() reads on win32, HOME everywhere else: set both, and point
 	// them at a temp dir so this test cannot write into the developer's real home directory.
 	const fakeHome = mkdtempSync(join(tmpdir(), "install-presets-home-"));
-	const name = "MiniMax-M3.1-Flash-Preview.md";
+	const name = PRESET;
 	const seeded = join(fakeHome, ".pi", "agent", "model-system-prompt", name);
 	try {
 		const run = spawnSync(process.execPath, ["install-presets.mjs"], {
@@ -109,8 +112,8 @@ test("the documented install seeds the preset through the packaged postinstall h
 	const repo = join(import.meta.dirname, "..");
 	// One command string with quoted paths rather than args + shell: Node deprecates unescaped args
 	// under a shell, and on win32 a .cmd shim cannot be started without one. These are temp paths.
-	const run = (command: string, env?: NodeJS.ProcessEnv) =>
-		spawnSync(command, { cwd: repo, env, shell: true, encoding: "utf8" });
+	const run = (command: string, opts?: { env?: NodeJS.ProcessEnv; cwd?: string }) =>
+		spawnSync(command, { cwd: opts?.cwd ?? repo, env: opts?.env, shell: true, encoding: "utf8" });
 
 	if (run("pi --version").status !== 0) {
 		t.skip("pi CLI is not on PATH");
@@ -119,29 +122,73 @@ test("the documented install seeds the preset through the packaged postinstall h
 
 	const root = mkdtempSync(join(tmpdir(), "install-presets-npm-"));
 	const home = join(root, "home");
+	const agent = join(root, "agent");
 	const packs = join(root, "packs");
 	mkdirSync(packs, { recursive: true });
-	const name = "MiniMax-M3.1-Flash-Preview.md";
+	const name = PRESET;
+	const shipped = join(repo, "presets", name);
 	const seeded = join(home, ".pi", "agent", "model-system-prompt", name);
-	try {
-		const packed = run(`npm pack --json --pack-destination "${packs}"`);
-		assert.equal(packed.status, 0, packed.stderr);
-		const tarball = join(packs, JSON.parse(packed.stdout)[0].filename);
+	// Both directories are redirected: os.homedir() reads USERPROFILE on win32, HOME elsewhere.
+	const env = { ...process.env, HOME: home, USERPROFILE: home, PI_CODING_AGENT_DIR: agent };
+	// `npm:<name>@file:<tarball>` rather than a bare tarball path, and forward slashes inside the
+	// file: URL. Under the bare form pi installs the package and runs the hook but never discovers
+	// the extension; the named form is also the shape the documented command uses. See the ticket.
+	const spec = (pkg: string, file: string) => `npm:${pkg}@file:${file.replace(/\\/g, "/")}`;
+	const pack = (dir: string, pkg: string) => {
+		const out = run(`npm pack --json --pack-destination "${packs}"`, { cwd: dir });
+		assert.equal(out.status, 0, out.stderr);
+		return spec(pkg, join(packs, JSON.parse(out.stdout)[0].filename));
+	};
 
-		// Both directories are redirected: os.homedir() reads USERPROFILE on win32, HOME elsewhere.
-		const env = { ...process.env, HOME: home, USERPROFILE: home, PI_CODING_AGENT_DIR: join(root, "agent") };
-		const install = run(`pi install "npm:${tarball}"`, env);
-		assert.equal(install.status, 0, install.stderr);
+	try {
+		const ours = pack(repo, "pi-model-system-prompt");
+
+		// A package with a different name, so installing it exercises npm's tree rather than a
+		// re-run of our own hook. It is a real pi package so pi accepts it.
+		const otherDir = join(root, "unrelated");
+		mkdirSync(otherDir, { recursive: true });
+		writeFileSync(join(otherDir, "package.json"), JSON.stringify({
+			name: "pi-unrelated-noop",
+			version: "0.0.1",
+			keywords: ["pi-package"],
+			pi: { extensions: ["./index.ts"] },
+			files: ["index.ts"],
+		}));
+		writeFileSync(join(otherDir, "index.ts"), "export default function noop() {}\n");
+		const other = pack(otherDir, "pi-unrelated-noop");
+
+		const install = (spec_: string) => {
+			const out = run(`pi install "${spec_}"`, { env });
+			assert.equal(out.status, 0, out.stderr);
+		};
+
+		install(ours);
 		assert.deepEqual(
 			readFileSync(seeded),
-			readFileSync(join(repo, "presets", name)),
+			readFileSync(shipped),
 			"one pi install landed the preset in the redirected home",
 		);
 
+		// The extension pi installed is a copy in its npm tree, and pi itself is a peer that npm
+		// did not install, so the tree carries no second copy of it.
+		assert.equal(existsSync(join(agent, "npm", "node_modules", "pi-model-system-prompt", "index.ts")), true);
+		assert.equal(
+			existsSync(join(agent, "npm", "node_modules", "@earendil-works")),
+			false,
+			"the peer pi was not installed into the managed tree",
+		);
+
+		// Installing twice in a row changes nothing the second time.
+		install(ours);
+		assert.deepEqual(readFileSync(seeded), readFileSync(shipped), "a second install changed nothing");
+
+		// Nor does installing a different package, which is the case a re-run of our hook would break.
+		install(other);
+		assert.deepEqual(readFileSync(seeded), readFileSync(shipped), "installing another package changed nothing");
+
 		// Deleting a preset is how a model is turned off; installing again must not undo it.
 		rmSync(seeded);
-		const again = run(`pi install "npm:${tarball}"`, env);
-		assert.equal(again.status, 0, again.stderr);
+		install(ours);
 		assert.equal(existsSync(seeded), false, "a deleted preset stayed deleted");
 	} finally {
 		rmSync(root, { recursive: true, force: true });

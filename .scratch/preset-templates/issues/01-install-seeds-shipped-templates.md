@@ -9,41 +9,41 @@ file the user owns: editable, and deletable to turn that model off.
 
 **Status:** done
 
-- [ ] At least one preset ships with the package, named after the model it configures
-- [ ] Installing is one command, documented as one command: `pi install npm:pi-model-system-prompt`.
+- [x] At least one preset ships with the package, named after the model it configures
+- [x] Installing is one command, documented as one command: `pi install npm:pi-model-system-prompt`.
       It both installs the extension and copies the presets into the user's prompt directory. There
       is no second command, and nothing happens at pi start-up
-- [ ] The copy is made by the published package's own npm install lifecycle — a `postinstall` hook
+- [x] The copy is made by the published package's own npm install lifecycle — a `postinstall` hook
       that runs once, when pi installs the package. Not by extension load code, and not by a command
       the user runs by hand
-- [ ] pi discovers and loads the extension from the installed npm copy, through the entry point the
+- [x] pi discovers and loads the extension from the installed npm copy, through the entry point the
       package declares
-- [ ] The package declares pi's own packages as peers rather than dependencies, so the installed tree
+- [x] The package declares pi's own packages as peers rather than dependencies, so the installed tree
       carries no second copy of them and pi suppresses peer installation for the managed install
 - [ ] The package is installable from npm as `pi-model-system-prompt`; publishing it is a documented
       one-time step
-- [ ] Presets land in the same directory the extension reads at run time — one location, never a
+- [x] Presets land in the same directory the extension reads at run time — one location, never a
       second copy
-- [ ] Installing over a file the user already has leaves that file byte for byte as it was, whether
+- [x] Installing over a file the user already has leaves that file byte for byte as it was, whether
       or not they edited it
-- [ ] Installing into a prompt directory that does not exist yet creates it
-- [ ] Installing twice in a row changes nothing the second time
-- [ ] A preset the user deleted stays deleted: neither a later install of a different package nor
+- [x] Installing into a prompt directory that does not exist yet creates it
+- [x] Installing twice in a row changes nothing the second time
+- [x] A preset the user deleted stays deleted: neither a later install of a different package nor
       re-running the same install brings it back. (A version upgrade does run the hook again and will
       re-seed; which way that falls is not asserted here.)
-- [ ] Nothing is written beside the presets themselves: no manifest, no state file, no marker
+- [x] Nothing is written beside the presets themselves: no manifest, no state file, no marker
       recording what was installed. The install-once guarantee comes from npm's own dependency state,
       not from a file this project writes
-- [ ] Only prompt files are seeded; anything else shipped alongside them is left alone
-- [ ] A seeded preset is indistinguishable from one the user wrote: they can edit it, and deleting
+- [x] Only prompt files are seeded; anything else shipped alongside them is left alone
+- [x] A seeded preset is indistinguishable from one the user wrote: they can edit it, and deleting
       it turns that model off exactly as an unconfigured model behaves
-- [ ] Development is unchanged: the project still installs as a local-path package that pi loads from
+- [x] Development is unchanged: the project still installs as a local-path package that pi loads from
       source, editable and reloadable, with the seeding script still runnable by hand on a dev machine
-- [ ] The seeding behaviour is covered by an automated check that exercises the packaged artifact the
+- [x] The seeding behaviour is covered by an automated check that exercises the packaged artifact the
       way a user installs it: pack the package, run the real `pi install npm:<tarball>` with the agent
       directory *and* the home directory redirected to temporary locations, and assert the preset
       lands in the redirected prompt directory and the command exits 0
-- [ ] The project's own documentation — the agent instructions and the domain model's definition of
+- [x] The project's own documentation — the agent instructions and the domain model's definition of
       "Install" — describes install as that single command, not as two steps
 
 ## Notes
@@ -79,22 +79,130 @@ registry explicitly; that is a packaging step, not a behaviour of the extension.
 
 ## Comments
 
-### Acceptance criteria evidence
+Criterion 6 is the one box left unticked. Everything else below is either automated or was run by
+hand against the real `pi` 0.99.2 binary on this machine.
 
-1. **At least one preset ships** — `presets/MiniMax-M3.1-Flash-Preview.md` (6119 bytes). Included in tarball per `npm pack --dry-run`.
-2. **One command, documented as one command** — README.md, AGENTS.md, CONTEXT.md all show `pi install npm:pi-model-system-prompt` as the user-facing install. E2E test runs exactly one `pi install` and asserts preset lands.
-3. **Copy via postinstall hook** — `package.json` has `"postinstall": "node install-presets.mjs"`. Extension code (`index.ts`) only reads, never writes. Verified in E2E test.
-4. **pi discovers/loads from installed copy** — Manual verification: ran `pi install npm:pi-model-system-prompt-0.1.0.tgz` in redirected agent dir; `pi list` shows `npm:pi-model-system-prompt-0.1.0.tgz` under "User packages". Package declares `pi.extensions: ["./index.ts"]`.
-5. **Pi packages as peers** — `package.json` has `peerDependencies: { "@earendil-works/pi-coding-agent": "*" }`, no `dependencies`. Per pi docs, managed installs suppress peer installation.
-6. **Installable from npm** — Package name is `pi-model-system-prompt`. Verified installable from local tarball via `pi install npm:<tarball>`. AGENTS.md documents publishing as manual one-time step targeting public registry explicitly.
-7. **Same directory, one location** — Both `installPresets()` and extension's `promptsDir()` resolve to `~/.pi/agent/model-system-prompt/<modelId>.md`.
-8. **Never overwrites user file** — Test "never overwrites a file the user already has, edited or not" in test/install-presets.test.ts. E2E test also verifies this across two installs.
-9. **Creates missing directory** — Test "copies a preset into a target directory that does not exist yet". Uses `mkdirSync(target, { recursive: true })`.
-10. **Idempotent (install twice)** — Test "installing twice is idempotent..." returns `{ copied: [], skipped: [...] }` on second run.
-11. **Deleted preset stays deleted** — E2E test deletes seeded preset, runs `pi install` again with same tarball, asserts file still gone. npm reports "up to date" for already-satisfied dependencies.
-12. **No manifest/state/marker files** — `installPresets()` only calls `copyFileSync` for .md files; creates no manifest or marker. Verified in E2E test: only preset .md appears in redirected prompt dir.
-13. **Only .md files seeded** — `installPresets()` filters with `name.endsWith(".md")`. Test "copies only the missing presets..." verifies non-.md files not copied.
-14. **Seeded preset = user file (edit/delete)** — Extension reads fresh on every run (`readFileSync` in `before_agent_start`). Tests verify edits apply next run; deleting file = no injection (unconfigured model behavior).
-15. **Development unchanged** — AGENTS.md documents both paths. `npm run install-presets` script preserved for manual dev seeding.
-16. **Automated check with real pi install** — Test "the documented install seeds the preset through the packaged postinstall hook" in test/install-presets.test.ts. Runs `npm pack`, then `pi install npm:<tarball>` with HOME/USERPROFILE/PI_CODING_AGENT_DIR redirected to temp dirs. Asserts preset lands and exits 0. Skips if pi not on PATH.
-17. **Documentation says one command** — AGENTS.md Install section shows single command first, dev path separate. CONTEXT.md "Install" definition updated to one command.
+### Criterion 4 — pi loads the extension from the installed copy
+
+The earlier claim here cited `pi list`, which only prints sources recorded in settings and proves
+nothing about loading. Replaced with a probe of pi's own resource loader.
+
+Install under the package **name**, against a temp home and agent dir:
+
+```sh
+npm pack --json --pack-destination "$TMP/packs"          # from the repo
+pi install "npm:pi-model-system-prompt@file:$TMP/packs/pi-model-system-prompt-0.1.0.tgz"
+```
+
+Probe (`$PI_CODING_AGENT_DIR` = the temp agent dir):
+
+```js
+const piDir = "<npm global root>/node_modules/@earendil-works/pi-coding-agent";
+const { DefaultResourceLoader } = await import(`file:///${piDir}/dist/core/resource-loader.js`);
+const loader = new DefaultResourceLoader({ cwd: process.cwd(), agentDir: process.env.PI_CODING_AGENT_DIR });
+await loader.reload();
+const ext = loader.getExtensions();
+console.log(JSON.stringify({
+  extensions: ext.extensions.map((e) => ({
+    path: e.path, origin: e.sourceInfo.origin, scope: e.sourceInfo.scope, handlers: [...e.handlers.keys()],
+  })),
+  errors: ext.errors, warnings: ext.warnings,
+}, null, 2));
+```
+
+Observed output:
+
+```json
+{
+  "extensions": [
+    {
+      "path": "C:\Users\joker\AppData\Local\Temp\verify\agent\npm\node_modules\pi-model-system-prompt\index.ts",
+      "origin": "package",
+      "scope": "user",
+      "handlers": [ "before_agent_start" ]
+    }
+  ],
+  "errors": [],
+  "warnings": []
+}
+```
+
+The path is inside the agent dir's npm tree, `origin` is `package` (it came in through the declared
+entry point, not as a top-level file), there are no errors or warnings, and the handler map holds
+`before_agent_start`, which means the factory actually ran. `tools` is empty because this extension
+registers no tools — that is correct, not a gap.
+
+**Negative observation, and why the e2e test changed shape.** Repeating the install with a bare
+`npm:<tarball>` spec seeds the preset identically but the same probe returns:
+
+```json
+{ "extensions": [], "errors": [], "warnings": [] }
+```
+
+So the bare-tarball form installs and seeds without pi ever discovering the extension. The e2e test
+now installs with the `npm:<name>@file:<tarball>` form, which both seeds the preset and is the shape
+the documented `npm:pi-model-system-prompt` spec actually takes, so the test exercises the form that
+works end to end.
+
+**Not automated, deliberately.** Doing this from a test means importing `dist/core/resource-loader.js`
+out of pi's internals, pinning a test to a private module path that carries no stability promise. For
+one criterion that is the wrong trade, so the load check stays a documented manual probe. The e2e
+test does assert the weaker filesystem facts around it: the copy lands at
+`<agentDir>/npm/node_modules/pi-model-system-prompt/index.ts`, and no `@earendil-works` directory
+appears in the managed tree.
+
+### Criteria 10 and 11 — idempotence, and deletion surviving other installs
+
+Both are now in the e2e test, which runs this sequence against the real CLI with `HOME`, `USERPROFILE`
+and `PI_CODING_AGENT_DIR` all redirected to temp dirs and the tarballs packed into a temp dir:
+
+1. `pi install` our package — asserts the preset is byte-identical to `presets/`.
+2. Asserts the copy landed in the agent npm tree and that no `@earendil-works` was installed there.
+3. **Criterion 10:** `pi install` our package again with the preset present — asserts it is still
+   byte-identical. This is the literal back-to-back case, separate from the deletion case.
+4. **Criterion 11, first half:** `pi install` a second, unrelated package (`pi-unrelated-noop`, a
+   real minimal pi package packed from a temp dir) — asserts the preset is still byte-identical.
+5. **Criterion 11, second half:** delete the preset, `pi install` our package again — asserts it is
+   still gone.
+
+The test is not vacuous: with `postinstall` removed from `package.json` it fails on the first
+assertion, and passes again once restored. Full run is about 10s, and it skips if `pi` is not on PATH.
+
+### Criterion 6 — not met, deliberately unticked
+
+The package is not published. Against the public registry:
+
+```sh
+npm view pi-model-system-prompt --registry https://registry.npmjs.org/
+# npm error 404  The requested resource 'pi-model-system-prompt@*' could not be found
+```
+
+Publishing is a human step that needs credentials, so it was not attempted. What remains: run
+`npm publish --registry https://registry.npmjs.org/` from a machine with publish credentials (the
+configured registry here is the `npmreg.proxy.ustclug.org` mirror, so the target must be explicit),
+then re-run `npm view pi-model-system-prompt` and a real `pi install npm:pi-model-system-prompt` to
+close this box. The packaging is otherwise proven — the same tarball installs and loads from a
+`file:` spec (criterion 4) — but "installable from npm" is not the same claim, and it stays open.
+
+### Judgement calls
+
+- **Missing-`presets` early return in `install-presets.mjs` — kept.** It is one line, and the
+  alternative is that a `postinstall` hook throws `ENOENT` and takes the user's entire `pi install`
+  down with it. A hook is the one part of this package that runs where we do not control failure
+  handling, on the user's machine, during the single command criterion 2 promises will work. Made
+  total, it costs a line. The branch is unreachable for a correct published tarball (`presets/` is in
+  the `files` whitelist) and is covered by its own test.
+- **README blurb — kept.** The README is the npm package page, i.e. the only documentation a user
+  installing `pi install npm:pi-model-system-prompt` actually lands on. Criterion 2 asks for install
+  to be documented as one command; that is not satisfied by AGENTS.md, which no npm visitor reads.
+  It is four lines: what it does, the one command, and the prompt-file path.
+- **Duplicate preset filename in the test — fixed.** The shipped filename was a literal in three
+  places; it is now one `PRESET` constant, so a rename is a one-line change.
+- **Project name differing across docs — left as is, deliberately.** The two names are different
+  things: `pi-model-system-prompt` is the npm package name, and `model-system-prompt` is the project
+  name used by `spec.md` (untouched), the repo directory, and therefore AGENTS.md and CONTEXT.md. The
+  README heading carries the package name because that is what npm renders and what users type.
+  Collapsing them would either contradict `spec.md` or make the README lie about the package.
+- **Two stale copies of the old package name, fixed.** The rename left `index.ts`'s header comment
+  and `package-lock.json` still saying `model-system-prompts`. Both are artifacts of this ticket's own
+  rename, so they were corrected rather than left as drift.
