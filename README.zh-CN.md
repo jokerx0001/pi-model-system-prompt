@@ -36,6 +36,19 @@ pi install npm:pi-model-system-prompt
 * glm-5.3
 * kimi-k3
 
+## 预置提示词来源
+均来自于各官方模型自己的专用coding agent工具
+
+minimax来自于minimax code
+
+glm来自于zcode
+
+deepseek来自于deepseek harness
+
+欢迎提交新的模型预置提示词
+
+为了核实通用性，但是必须标注清楚来源，必须是官模调校
+
 ## 首次运行会发生什么
 
 | 你已经有… | 会发生什么 |

@@ -8,7 +8,7 @@ GLM-5.3 / GLM-5.3-Flash (source: `zai-org/ZCode`).
 Two inventories, one per source repo, listing every file that carries harness prompt-layer text,
 one row per content item, each item marked 借鉴 / 剥离后借鉴 / 不借鉴 with a reason:
 
-- [`research/dsh-deepseek.md`](research/dsh-deepseek.md) — dsh @ `5badb15` · 61 files / 70 items · 7 / 31 / 32
+- [`research/dsh-deepseek.md`](research/dsh-deepseek.md) — dsh @ `5badb15` · 61 files / 70 items · 7 / 27 / 36
 - [`research/zcode-glm.md`](research/zcode-glm.md) — ZCode @ `29628c9` · 45 files / 74 items · 24 / 18 / 32
 
 Each states its enumeration method, its coverage gaps, and a `判定自检` section for the entries that
