@@ -1,6 +1,6 @@
 {
   "name": "pi-model-system-prompt",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Per-model system prompt for pi: appends the prompt file named after the active model id",
   "type": "module",
   "keywords": [
