@@ -4,7 +4,15 @@
   "description": "Per-model system prompt for pi: appends the prompt file named after the active model id",
   "type": "module",
   "keywords": [
-    "pi-package"
+    "pi-package",
+    "pi",
+    "system-prompt",
+    "harness",
+    "ai",
+    "coding-agent",
+    "extension",
+    "claude",
+    "llm"
   ],
   "pi": {
     "extensions": [
