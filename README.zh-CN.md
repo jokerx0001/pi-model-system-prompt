@@ -55,3 +55,9 @@ deepseek来自于deepseek harness
 | --- | --- |
 | 什么都没有 | 预置模型系统提示词被复制进 `~/.pi/agent/model-system-prompt/`。 |
 | 自己写的 `~/.pi/agent/model-system-prompt/<modelId>.md` | 一律不动。 |
+
+## ☕ 支持这个项目
+
+如果你觉得这个项目有用，可以请作者喝杯咖啡
+
+[![Support me on Ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/你的用户名)

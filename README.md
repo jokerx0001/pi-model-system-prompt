@@ -42,3 +42,9 @@ Models with preset system prompts
 | --- | --- |
 | Nothing | The preset model system prompts are copied into `~/.pi/agent/model-system-prompt/`. |
 | Your own `~/.pi/agent/model-system-prompt/<modelId>.md` | None of them is touched. |
+
+## ☕ Support the project
+
+If you find this project useful, consider supporting its development.
+
+[![Support me on Ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/jokerx001)
