@@ -16,7 +16,7 @@ A pi extension that appends a per-model system prompt, chosen by the active mode
   `ExtensionContext`, so a member pi does not have is a compile error rather than a shape the
   tests quietly agree with.
 - `.scratch/` — issues and specs
-- `docs/agents/` — issue tracker, triage labels, domain doc conventions
+- `docs/agents/` — issue tracker, triage labels, domain doc, and preset research conventions
 
 The extension only ever reads `~/.pi/agent/model-system-prompt/`. Once a preset is copied there it
 is indistinguishable from a file the user wrote: the user edits it, or empties it to turn that
@@ -73,6 +73,37 @@ The typecheck covers `index.ts` and the test. That is the point: the handler is 
 pi's interface, and the stub it is tested through is checked against pi's context type. Both
 directions matter, because the bug that shipped here was the code and the test agreeing with
 each other about an interface neither of them had checked.
+
+## Preset research and writing
+
+A preset is prompt text harvested from a model's own official agent tool: shipped in `presets/`,
+listed in both READMEs, copied into the user's prompt directory on install. The method — how a round
+is dispatched, how the source is read and cited, the judgment rubric, what a preset file must look
+like — is in `docs/agents/preset-research.md`. Read it before starting a round.
+
+Settled decisions. Each one below has cost a round every time it was re-opened:
+
+- **可用性 decides a rule that names a tool.** A rule that needs a tool or mechanism pi does not have is 不借鉴, and
+  is never rewritten into a `{{placeholder}}` shell. Judge against pi's **built-in** tools — `read`
+  `write` `edit` `bash` `grep` `find` `ls` `powershell` — not against whatever this session happens
+  to have installed: a preset ships to users who have only the base harness.
+- **Identity sentences are never taken.** The extension appends to pi's own system prompt, so a second
+  "You are…" fights the first. The source harness replaces its prompt wholesale; we do not.
+- **分档 is mirrored.** When the source harness picks between prompt variants per model, we ship one
+  file per tier rather than one merged file.
+- **自足 beats factoring.** Text the source gives every tier is repeated verbatim in every file: no
+  includes, no shared file, no manifest. The extension resolves a model id to a single file by name,
+  so a user empties one file and turns off exactly that tier.
+- **File names are the shortest shared prefix of the ids they serve** — `claude-sonnet-5.md` covers
+  `claude-sonnet-5`, `claude-sonnet-5-1` and `claude-sonnet-5.1`. Twins that are byte copies are the
+  expected shape, not an accident, and editing one means editing the other.
+- **The pin goes in the research file, not the preset.** Provenance inside a preset is sent to the
+  model on every run.
+- Presets are content, not code. Nothing is verified per preset, and a round needs neither a model
+  connection nor the local harness installed.
+
+Dispatch subagents on `minimax-cn/MiniMax-M3.1-Flash-Preview:high` — research rounds are long and
+this one is cheap.
 
 ## Agent skills
 
