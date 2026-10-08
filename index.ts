@@ -2,7 +2,8 @@
  * pi-model-system-prompt
  *
  * Appends a per-model system prompt to every run. The text for the active model is
- * read from ~/.pi/agent/model-system-prompt/<modelId>.md; no file means no injection.
+ * read from ~/.pi/agent/model-system-prompt/, choosing the file whose name is the longest
+ * case-insensitive prefix of the model id; no file means no injection.
  *
  * Why force-append instead of a structured section: once any handler sets
  * `forceSystemPrompt`, `buildSystemPromptState()` returns that text alone and drops
@@ -14,13 +15,46 @@
  * Read per run, so editing a .md takes effect on the next message with no /reload.
  */
 
-import { existsSync, readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 
 function promptsDir(): string {
 	return join(homedir(), ".pi", "agent", "model-system-prompt");
+}
+
+/**
+ * The prompt file the model id resolves to: the longest case-insensitive filename prefix
+ * of the id. The directory is listed rather than probed because case-insensitivity has to
+ * hold on Linux, where an exact-case probe cannot see a mis-cased name. A `.md` with an
+ * empty stem is not a candidate, and ties (only possible on a case-sensitive filesystem,
+ * where two names may differ only in case) go to the stem whose casing matches the id, then
+ * to the lexicographically first, so the answer never depends on readdir order. The exact
+ * file needs no branch: no longer name can prefix the id it is compared against.
+ */
+function promptFileFor(dir: string, modelId: string): string | undefined {
+	let names: string[];
+	try {
+		names = readdirSync(dir);
+	} catch {
+		return undefined; // no prompt directory
+	}
+
+	const id = modelId.toLowerCase();
+	const better = (stem: string, best: string) => {
+		if (stem.length !== best.length) return stem.length > best.length;
+		const exact = (s: string) => s === modelId.slice(0, s.length);
+		return exact(stem) !== exact(best) ? exact(stem) : stem < best;
+	};
+
+	let best: string | undefined;
+	for (const name of names) {
+		if (!name.toLowerCase().endsWith(".md")) continue;
+		const stem = name.slice(0, -3);
+		if (stem && id.startsWith(stem.toLowerCase()) && (best === undefined || better(stem, best))) best = stem;
+	}
+	return best === undefined ? undefined : join(dir, `${best}.md`);
 }
 
 export default function modelSystemPrompts(pi: ExtensionAPI) {
@@ -30,11 +64,12 @@ export default function modelSystemPrompts(pi: ExtensionAPI) {
 		const modelId = ctx.model?.id;
 		if (!modelId) return;
 
-		const file = join(promptsDir(), `${modelId}.md`);
-		if (!existsSync(file)) return;
+		// The winner is chosen by name alone, so an empty or unreadable one means off — no
+		// shorter candidate is consulted. Unreadable is a no-op like every other form of
+		// absence, not an error: a permissions slip on the user's side must not break their run.
+		const file = promptFileFor(promptsDir(), modelId);
+		if (!file) return;
 
-		// Unreadable is a no-op like every other form of absence, not an error: a permissions
-		// slip on the user's side must not break their run.
 		let text: string;
 		try {
 			text = readFileSync(file, "utf8");

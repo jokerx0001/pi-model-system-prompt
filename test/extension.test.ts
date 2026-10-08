@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -150,6 +150,85 @@ test("reads the file fresh, so edits apply to the next run", () => {
 		assert.equal(runBeforeAgentStart(handlers, { modelId: "glm-4.7-flash" })?.systemPrompt, "BASE\n\nFirst.");
 		write("glm-4.7-flash.md", "Second.");
 		assert.equal(runBeforeAgentStart(handlers, { modelId: "glm-4.7-flash" })?.systemPrompt, "BASE\n\nSecond.");
+	});
+});
+
+test("a family file serves an id with no file of its own", () => {
+	withPrompts({ "glm.md": "Family text." }, ({ handlers }) => {
+		const result = runBeforeAgentStart(handlers, { modelId: "glm-5.3-flash" });
+		assert.equal(result?.systemPrompt, "BASE\n\nFamily text.");
+	});
+});
+
+test("the exact file wins over a shorter family file", () => {
+	withPrompts({ "glm.md": "Family text.", "glm-5.3.md": "Exact text." }, ({ handlers }) => {
+		const result = runBeforeAgentStart(handlers, { modelId: "glm-5.3" });
+		assert.equal(result?.systemPrompt, "BASE\n\nExact text.");
+	});
+});
+
+test("the longest of three candidates wins", () => {
+	const files = { "glm.md": "One.", "glm-5.3.md": "Two.", "glm-5.3-flash.md": "Three." };
+	withPrompts(files, ({ handlers }) => {
+		const result = runBeforeAgentStart(handlers, { modelId: "glm-5.3-flash-2" });
+		assert.equal(result?.systemPrompt, "BASE\n\nThree.");
+	});
+});
+
+test("an empty winner suppresses the family file and does not fall back", () => {
+	withPrompts({ "glm.md": "Family text.", "glm-5.3.md": "" }, ({ handlers }) => {
+		assert.equal(runBeforeAgentStart(handlers, { modelId: "glm-5.3" }), undefined);
+		// "glm-5.3" is still the longest prefix of "glm-5.3-flash", so it is that id's winner too.
+		assert.equal(runBeforeAgentStart(handlers, { modelId: "glm-5.3-flash" }), undefined);
+	});
+});
+
+test("a whitespace-only winner suppresses the family file", () => {
+	withPrompts({ "glm.md": "Family text.", "glm-5.3.md": "  \n\t " }, ({ handlers }) => {
+		assert.equal(runBeforeAgentStart(handlers, { modelId: "glm-5.3" }), undefined);
+	});
+});
+
+test("an unreadable winner does not fall back to the family file", () => {
+	withPrompts({ "glm.md": "Family text." }, ({ dir, handlers }) => {
+		mkdirSync(join(dir, "glm-5.3.md"));
+		assert.equal(runBeforeAgentStart(handlers, { modelId: "glm-5.3" }), undefined);
+	});
+});
+
+test("matches the model id case-insensitively", () => {
+	withPrompts({ "MiniMax-M3.md": "Be terse." }, ({ handlers }) => {
+		assert.equal(runBeforeAgentStart(handlers, { modelId: "minimax-m3" })?.systemPrompt, "BASE\n\nBe terse.");
+	});
+});
+
+test("a file named .md is not a candidate, being an empty prefix", () => {
+	withPrompts({ ".md": "Nothing.", "g.md": "Geen." }, ({ handlers }) => {
+		assert.equal(runBeforeAgentStart(handlers, { modelId: "glm-5.3" })?.systemPrompt, "BASE\n\nGeen.");
+	});
+});
+
+test("names differing only in case break to the id's own casing, then to the first stem", () => {
+	// Only a case-sensitive filesystem can hold two names that differ only in case; where it
+	// cannot, the second write lands on the first file and there is no tie to break, so the
+	// whole case is skipped rather than asserting a name that could not exist.
+	let caseSensitive = false;
+	withPrompts({}, ({ dir, write }) => {
+		write("probe.md", "a");
+		write("PROBE.md", "b");
+		caseSensitive = readdirSync(dir).includes("PROBE.md");
+	});
+	if (!caseSensitive) return;
+
+	withPrompts({ "gLM-5.3.md": "Mixed case.", "GLM-5.3.md": "Upper case.", "glm-5.3.md": "Lower case." }, ({ handlers }) => {
+		// The stem whose casing matches the id wins, whatever readdir handed over first.
+		assert.equal(runBeforeAgentStart(handlers, { modelId: "glm-5.3" })?.systemPrompt, "BASE\n\nLower case.");
+		assert.equal(runBeforeAgentStart(handlers, { modelId: "GLM-5.3" })?.systemPrompt, "BASE\n\nUpper case.");
+		assert.equal(runBeforeAgentStart(handlers, { modelId: "gLm-5.3" })?.systemPrompt, "BASE\n\nLower case.");
+	});
+	withPrompts({ "gLM-5.3.md": "Mixed case.", "glM-5.3.md": "Other mixed case." }, ({ handlers }) => {
+		// No stem's casing matches the id, so the lexicographically first stem wins: "gLM" before "glM".
+		assert.equal(runBeforeAgentStart(handlers, { modelId: "Glm-5.3" })?.systemPrompt, "BASE\n\nMixed case.");
 	});
 });
 
