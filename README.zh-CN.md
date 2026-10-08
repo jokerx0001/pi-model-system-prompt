@@ -31,10 +31,12 @@ pi install npm:pi-model-system-prompt
 预置系统提示词的模型列表
 * MiniMax-M3
 * MiniMax-M3.1-Flash-Preview
+* claude-sonnet-5、claude-haiku-5（Claude Code 的完整版系统提示词）
+* claude-opus-5、claude-fable-5（Claude Code 的较短版系统提示词）
 * deepseek-flash
 * glm-5.3-flash
 * glm-5.3
-* kimi-k3
+* kimi（kimi-k3 及同族其它 id）
 
 ## 匹配与覆盖规则
 谁生效，由文件名决定
@@ -42,7 +44,7 @@ pi install npm:pi-model-system-prompt
 1. 最长前缀胜出**。多个文件都能匹配同一个 model id 时，名字最长的那一个生效。比如 id 是 `glm-5.3-flash`，而 `glm-5.3-flash.md`、`glm-5.3.md`、`glm.md` 都在，那只有 `glm-5.3-flash.md` 生效。
 2. 与 id 完全同名的文件必定胜出。
 3. 不区分大小写。
-4. 没有通配符，只有字面前缀**。`glm.md` 也会命中 `glmish-2` 这种跟 glm 无关的 id。所以别起太短的名字：`g.md` 会吃掉所有以 g 开头的 id。
+4. 没有通配符，只有字面前缀**。`glm.md` 也会命中 `glmish-2` 这种跟 glm 无关的 id。所以别起太短的名字：`g.md` 会吃掉所有以 g 开头的 id。前缀从 id 的开头算起，所以叫 `claude-opus-5.md` 的文件命中不了带 provider 前缀的 id，比如 `anthropic.claude-opus-5`。
 
 ### 让某个模型不生效
 - 推荐：把生效的那个文件清空。文件在、内容为空 = 这个模型拿不到任何专属提示词，而且不会再回退去吃更短的同族文件。
@@ -58,6 +60,10 @@ minimax来自于minimax code
 glm来自于zcode
 
 deepseek来自于deepseek harness
+
+kimi来自于kimi code（整个模型族共用一份 harness，因此是一个族文件）
+
+claude来自于claude code（2.1.285，stable 通道；它自带完整版与较短版两套系统提示词，按模型选用，两套都照搬，每族一个文件）
 
 欢迎提交新的模型预置提示词
 

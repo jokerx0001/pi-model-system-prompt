@@ -31,10 +31,12 @@ The extension ships well-tuned preset prompts. Note that open-source models come
 Models with preset system prompts
 * MiniMax-M3
 * MiniMax-M3.1-Flash-Preview
+* claude-sonnet-5, claude-haiku-5 (Claude Code's full system prompt)
+* claude-opus-5, claude-fable-5 (Claude Code's shorter system prompt)
 * deepseek-flash
 * glm-5.3-flash
 * glm-5.3
-* kimi-k3
+* kimi (kimi-k3 and the rest of the family)
 
 ## Matching and override rules
 Which file wins is decided by its name
@@ -42,7 +44,7 @@ Which file wins is decided by its name
 1. **The longest prefix wins**. When several files match the same model id, the one with the longest name takes effect. For id `glm-5.3-flash`, with `glm-5.3-flash.md`, `glm-5.3.md` and `glm.md` all present, only `glm-5.3-flash.md` applies.
 2. A file named exactly after the id always wins.
 3. Case is ignored.
-4. No wildcards, literal prefixes only. `glm.md` also matches an unrelated id like `glmish-2`. So do not pick too short a name: `g.md` swallows every id starting with g.
+4. No wildcards, literal prefixes only. `glm.md` also matches an unrelated id like `glmish-2`. So do not pick too short a name: `g.md` swallows every id starting with g. The prefix counts from the start of the id, so a file named `claude-opus-5.md` does not match a provider-prefixed id such as `anthropic.claude-opus-5`.
 
 ### Turning a model off
 - Recommended: empty the file that would win. The file exists but is empty = the model gets no dedicated prompt, and it does not fall back to a shorter file of the same family.
@@ -57,6 +59,10 @@ minimax from minimax code
 glm from zcode
 
 deepseek from deepseek harness
+
+kimi from kimi code (one harness for the whole model family, so one family file)
+
+claude from claude code (2.1.285, stable channel — it ships a full and a shorter system prompt and picks by model; both are mirrored, one family file each)
 
 New preset model prompts are welcome
 
