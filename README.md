@@ -26,8 +26,6 @@ It takes effect as soon as it is installed. The extension picks the Markdown fil
 
 To write your own system prompt for a specific model, add a Markdown file in `~/.pi/agent/model-system-prompt/` named after that model — or after the family it belongs to, which then serves every model id starting with that name — and write the prompt in it. It is loaded automatically when you open pi.
 
-To turn a model off, empty its file. That also silences every id under the name: empty `glm-5.3.md` and `glm-5.3-flash` gets nothing either. Deleting works only while no shorter name still matches: delete `glm-5.3.md` and `glm-5.3` is still served by `glm.md`.
-
 The extension ships well-tuned preset prompts. Note that open-source models come in different quantizations and fine-tunes, so every preset prompt is tuned against its own official model, and no guarantee is made for unofficial builds. You are encouraged to tune the system prompt yourself to match the model you actually run.
 
 Models with preset system prompts
@@ -37,6 +35,32 @@ Models with preset system prompts
 * glm-5.3-flash
 * glm-5.3
 * kimi-k3
+
+## Matching and override rules
+Which file wins is decided by its name
+
+1. **The longest prefix wins**. When several files match the same model id, the one with the longest name takes effect. For id `glm-5.3-flash`, with `glm-5.3-flash.md`, `glm-5.3.md` and `glm.md` all present, only `glm-5.3-flash.md` applies.
+2. A file named exactly after the id always wins.
+3. Case is ignored.
+4. No wildcards, literal prefixes only. `glm.md` also matches an unrelated id like `glmish-2`. So do not pick too short a name: `g.md` swallows every id starting with g.
+
+### Turning a model off
+- Recommended: empty the file that would win. The file exists but is empty = the model gets no dedicated prompt, and it does not fall back to a shorter file of the same family.
+- Deleting a file is not turning it off. It only counts while no shorter name still matches: delete `glm-5.3.md` and `glm-5.3` is still served by `glm.md`.
+- To turn off a whole family, emptying the family file only covers ids with no more specific file — empty `glm.md` and `glm-4` gets nothing, but as long as `glm-5.3.md` is there, `glm-5.3-flash` still goes through `glm-5.3.md`. To really kill a family, empty every relevant `glm*.md`.
+
+## Where the preset prompts come from
+Each comes from the official coding agent tool of that model itself
+
+minimax from minimax code
+
+glm from zcode
+
+deepseek from deepseek harness
+
+New preset model prompts are welcome
+
+To verify generality, the source must be stated clearly and the prompt must be tuned against the official model
 
 ## What happens on first run
 
