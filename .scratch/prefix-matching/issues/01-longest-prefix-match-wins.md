@@ -59,10 +59,22 @@ Tests added to `test/extension.test.ts`, all in `node --test ./test/*.test.ts`:
 - `matches the model id case-insensitively`
 - `a file named .md is not a candidate, being an empty prefix`
 - `names differing only in case break to the id's own casing, then to the first stem`
+- `the prefix is raw, so glm.md serves glmish-2 with no separator`
+- `an upper-case extension is a candidate, and is read under the name on disk`
+- `an id with a slash resolves to the flat file, never a nested one`
+- `resolution is per run and uncached: a new longer file wins on the next call`
 
 The last one probes the filesystem first and returns early unless it can hold two names that
 differ only in case; on this Windows host the probe fails, so its assertions did not execute
-here. It is the one case of this ticket unverified on this machine.
+here. It is the one case of this ticket unverified on this machine. The early return now calls
+`t.diagnostic(...)`, so the skipped case is visible in the run output instead of passing silently.
+
+Correction: that test's third assertion, for id `gLm-5.3`, expected `Lower case.`, which no reading
+of the spec supports. No stem's casing equals `gLm-5.3`, so the tie-break falls to the
+lexicographically first stem, and in code-unit order `'G'` (0x47) sorts before `'g'` (0x67):
+`GLM-5.3` < `gLM-5.3` < `glm-5.3`. The winner is `GLM-5.3`, so it now expects `Upper case.`, and
+the comment above it says so. The other three assertions in that test are unchanged. Still
+unexecuted on this host, for the reason above.
 
 `npm run check` (typecheck + tests, host pi linked via `npm link @earendil-works/pi-coding-agent`):
 
@@ -91,6 +103,11 @@ here. It is the one case of this ticket unverified on this machine.
 ✔ matches the model id case-insensitively
 ✔ a file named .md is not a candidate, being an empty prefix
 ✔ names differing only in case break to the id's own casing, then to the first stem
+ℹ this filesystem cannot hold two names differing only in case; the case did not run
+✔ the prefix is raw, so glm.md serves glmish-2 with no separator
+✔ an upper-case extension is a candidate, and is read under the name on disk
+✔ an id with a slash resolves to the flat file, never a nested one
+✔ resolution is per run and uncached: a new longer file wins on the next call
 ✔ composes with another force-appending extension in either load order
 ✔ copies a preset into a target directory that does not exist yet
 ✔ never overwrites a file the user already has, edited or not
@@ -99,8 +116,8 @@ here. It is the one case of this ticket unverified on this machine.
 ✔ a missing presets directory seeds nothing and creates no directory
 ✔ the dev command seeds a fresh home directory through the real entry point
 ✔ the documented install seeds the preset through the packaged postinstall hook
-ℹ tests 26
-ℹ pass 26
+ℹ tests 30
+ℹ pass 30
 ℹ fail 0
 ```
 
@@ -140,14 +157,72 @@ changed:
 +	};
 +
 +	let best: string | undefined;
++	let bestName: string | undefined;
 +	for (const name of names) {
 +		if (!name.toLowerCase().endsWith(".md")) continue;
 +		const stem = name.slice(0, -3);
-+		if (stem && id.startsWith(stem.toLowerCase()) && (best === undefined || better(stem, best))) best = stem;
++		if (stem && id.startsWith(stem.toLowerCase()) && (best === undefined || better(stem, best))) {
++			best = stem;
++			bestName = name;
++		}
 +	}
-+	return best === undefined ? undefined : join(PROMPT_DIR, `${best}.md`);
++	// The listed name, not `${best}.md`: a candidate may be mis-cased in its extension
++	// ("GLM.MD"), and rebuilding would then read a file that does not exist on a
++	// case-sensitive filesystem — the winner would resolve and then read as missing.
++	return bestName === undefined ? undefined : join(PROMPT_DIR, bestName);
 +}
 ```
+
+Two follow-on fixes after review, the same two as in this repo's `index.ts`:
+
+1. The winner is the listed *entry*, not a name rebuilt from its stem. Rebuilding pointed the
+   inspector at `glm.md` when the file on disk is `GLM.MD`, so on a case-sensitive filesystem the
+   read would fail for a file the rule had already resolved.
+2. The `/system-prompt` handler's read of the winner is now wrapped, because the name rule can
+   select a *directory* — a stray `glm.md/` is the winner for every `glm*` id, which is exactly what
+   this repo's handler tests pin — and an unwrapped `readFileSync` threw `EISDIR` out of the
+   command. It now reports `unreadable` and carries on, matching the injection rule (nothing
+   injected, no fallback to a shorter match):
+
+```diff
+ 			const file = perModelFile(modelId);
+-			const expected = file ? readFileSync(file, "utf8").trim() : undefined;
++			// The winner is chosen by name alone, so a directory named `glm.md` is the winner for
++			// every `glm*` id and readFileSync would throw EISDIR straight out of the command.
++			// Report it the way model-system-prompt does: nothing to inject, no fallback.
++			let expected: string | undefined;
++			let readable = true;
++			try {
++				expected = file ? readFileSync(file, "utf8").trim() : undefined;
++			} catch {
++				readable = false;
++			}
+ 
+ 			ctx.ui.notify(`active model : ${model}`, "info");
+ 			ctx.ui.notify(
+-				file ? `per-model file: ${file} (${expected!.length} chars)` : "per-model file: none for this model",
+-				"info",
++				!file
++					? "per-model file: none for this model"
++					: readable
++						? `per-model file: ${file} (${expected!.length} chars)`
++						: `per-model file: ${file} (unreadable)`,
++				readable ? "info" : "warning",
+ 			);
+```
+
+```diff
+ 			} else {
+-				ctx.ui.notify(`no file to match. tail of last request:\n${lastSystem.slice(-400)}`, "info");
++				ctx.ui.notify(
++					`${readable ? "no file to match" : "the winning file could not be read, so there is no text to match"}. tail of last request:\n${lastSystem.slice(-400)}`,
++					"info",
++				);
+ 			}
+```
+
+These edits to the inspector are not under git and were not exercised by a test run; only this
+repo's `npm run check` was run.
 
 One note for the docs pass: the spec's Implementation Decisions say "`glm-5.3.md` empty and
 `glm.md` full means `glm-5.3` gets nothing; `glm-5.3-flash` still gets `glm.md`". Under the

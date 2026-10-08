@@ -49,12 +49,19 @@ function promptFileFor(dir: string, modelId: string): string | undefined {
 	};
 
 	let best: string | undefined;
+	let bestName: string | undefined;
 	for (const name of names) {
 		if (!name.toLowerCase().endsWith(".md")) continue;
 		const stem = name.slice(0, -3);
-		if (stem && id.startsWith(stem.toLowerCase()) && (best === undefined || better(stem, best))) best = stem;
+		if (stem && id.startsWith(stem.toLowerCase()) && (best === undefined || better(stem, best))) {
+			best = stem;
+			bestName = name;
+		}
 	}
-	return best === undefined ? undefined : join(dir, `${best}.md`);
+	// The listed name, not `${best}.md`: a candidate may be mis-cased in its extension
+	// ("GLM.MD"), and rebuilding would then read a file that does not exist on a
+	// case-sensitive filesystem — the winner would resolve and then read as missing.
+	return bestName === undefined ? undefined : join(dir, bestName);
 }
 
 export default function modelSystemPrompts(pi: ExtensionAPI) {
