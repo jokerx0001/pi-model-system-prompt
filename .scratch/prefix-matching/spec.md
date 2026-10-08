@@ -29,7 +29,8 @@ does not fall back to a shorter match.
 2. As a pi user, I want the most specific file I have to win, so that tuning one id is not
    overridden by a broader file, and a broad file is not silently shadowed where I meant it to apply.
 3. As a pi user, I want an empty file to mean "nothing, deliberately" even when a broader file
-   would otherwise match, so that I can turn one model off without giving up its family's text.
+   would otherwise match, so that I can turn a model and everything under its name off without
+   giving up the family text its siblings still need.
 4. As a pi user, I want naming to be the whole configuration — no globs, no pattern syntax, no
    manifest, no state file — so that what I see in the directory is what applies.
 5. As a pi user, I want a hand-written `minimax-m3.md` to serve `MiniMax-M3`, so that my casing
@@ -44,8 +45,10 @@ does not fall back to a shorter match.
 ## Implementation Decisions
 
 - **Resolution rule, stated once.** List the prompt directory. A candidate is a file whose name
-  ends in `.md` and whose stem is a non-empty prefix of the active model id, compared
-  case-insensitively. The winner is the longest stem. Read the winner: if it cannot be read, or
+  ends in `.md` (that check is case-insensitive too) and whose stem is a non-empty prefix of the
+  active model id, compared case-insensitively. The winner is the longest stem, and it is read
+  under the name the listing actually returned — never under a rebuilt `<stem>.md` path, which
+  would miss a file like `GLM.MD` on a case-sensitive filesystem. If the winner cannot be read, or
   trims to nothing, inject nothing and stop.
 - **Raw prefix, no separator required.** `glm.md` matches `glmish-2`. This is the accepted cost of
   the simplest rule; separator-bounded matching was rejected as an extra rule to remember for a
@@ -65,9 +68,11 @@ does not fall back to a shorter match.
   fallback when the winner turns out to be empty or unreadable — the alternative makes the effective
   rule depend on the platform's error for the same on-disk state (EACCES on Linux, EISDIR on
   Windows for the same mistake).
-- **Empty means off, and only where it is the winner.** `glm-5.3.md` empty and `glm.md` full means
-  `glm-5.3` gets nothing; `glm-5.3-flash` still gets `glm.md`. That is the user's stated rule, and
-  it is what makes an empty file the reliable off switch once family files exist.
+- **Empty means off, and only where it is the winner.** `glm-5.3.md` empty with `glm.md` full means
+  `glm-5.3` gets nothing, and so does `glm-5.3-flash`: `glm-5.3` is still that id's longest prefix,
+  so emptying a name silences every id under it. That propagation is what makes an empty file the
+  reliable off switch once family files exist, and it is what the READMEs and the prompt
+  directory's own README say.
 - **Deleting stops being an off switch wherever a shorter file still matches.** Deleting
   `glm-5.3.md` no longer turns that id off while `glm.md` exists. Documented rather than repaired:
   repairing it needs a state file or an in-file marker syntax, both rejected.
@@ -76,8 +81,10 @@ does not fall back to a shorter match.
   change alters nothing; it first shows up when a shorter family file exists.
 - **The resolution is per run and uncached.** Same as before: a `readdirSync` of a directory
   holding a handful of files, so a newly written or edited file applies to the next message.
-- **Nested prompt paths are dropped.** An id containing `/` used to resolve to `dir/<id>.md` inside
-  a subdirectory; a flat listing no longer finds it. No id in the catalogue contains a slash.
+- **Nested prompt files are dropped; ids containing a slash get no special case.** Such an id used
+  to resolve to a file inside a subdirectory (`dir/<id>.md`), and a flat listing never finds that
+  file again. The id can still be served by a flat file through the ordinary prefix rule
+  (`openai.md` serves `openai/gpt-4`). No id in the catalogue contains a slash.
 
 ## Testing Decisions
 
@@ -94,6 +101,12 @@ context, assert only the value returned. Case-level additions:
 - **An unreadable winner does not fall back**: a directory named `glm-5.3.md` beside a full
   `glm.md` returns nothing, which pins the platform-independent reading of the rule.
 - **Case-insensitive matching**: `MiniMax-M3.md` serves id `minimax-m3`.
+- **The prefix is raw**: `glm.md` serves id `glmish-2`, pinning the accepted cost rather than
+  leaving it to prose.
+- **A mis-cased extension**: `GLM.MD` serves id `glm`, and is read under the name on disk.
+- **An id containing a slash**: `openai.md` serves `openai/gpt-4`, and a real nested
+  `openai/gpt-4.md` is never found.
+- **Resolution is per run**: a longer file written between two calls wins on the second.
 - **A file named `.md` is not a candidate**, since its empty stem would otherwise prefix every id.
 - **The case tie-break is asserted only where the filesystem can hold both names**; the test
   detects a case-insensitive filesystem and skips.
@@ -104,6 +117,9 @@ context, assert only the value returned. Case-level additions:
 
 - Globs, wildcards, or any pattern syntax beyond a literal filename prefix
 - A required separator after the matched prefix
+- Unicode normalisation or case folding beyond `toLowerCase()`: names and ids are compared as raw
+  code units, so an NFD filename on macOS may not match a non-ASCII id — and no real model id is
+  non-ASCII
 - Model ids containing `/`, and therefore prompt files in subdirectories
 - Caching or preloading the resolution
 - Provider-qualified keys, or any change to how a provider is chosen
