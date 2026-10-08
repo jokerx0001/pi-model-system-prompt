@@ -1,6 +1,6 @@
 {
   "name": "pi-model-system-prompt",
-  "version": "0.1.2",
+  "version": "0.2.0",
   "description": "Per-model system prompt for pi: appends the prompt file whose name is the longest case-insensitive prefix of the active model id",
   "license": "MIT",
   "type": "module",
