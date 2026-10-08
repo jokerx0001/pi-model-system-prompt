@@ -36,6 +36,8 @@ Models with preset system prompts
 * deepseek-flash
 * glm-5.3-flash
 * glm-5.3
+* gpt-5.6 (gpt-5.6-luna, gpt-5.6-sol, gpt-5.6-terra — Codex ships one prompt for all three)
+* gpt-6-luna, gpt-6-sol, gpt-6-astra, gpt-6.1-sol (Codex rewrites the prompt per tier, so one file each)
 * kimi (kimi-k3 and the rest of the family)
 
 ## Matching and override rules
@@ -63,6 +65,8 @@ deepseek from deepseek harness
 kimi from kimi code (one harness for the whole model family, so one family file)
 
 claude from claude code (2.1.285, stable channel — it ships a full and a shorter system prompt and picks by model; both are mirrored, one family file each)
+
+gpt from codex (`openai/codex`, tag `rust-v0.161.0`; the text for a model id is the `instructions_template` field in `codex-rs/models-manager/models.json`, and the shipped `@openai/codex@0.161.0` binary carries the same bytes. Codex gives one prompt to the whole gpt-5.6 family and a rewritten one to each gpt-6 tier, so 5.6 is a single family file while each gpt-6 tier has its own — a later generation ships its own text and needs its own file.)
 
 New preset model prompts are welcome
 

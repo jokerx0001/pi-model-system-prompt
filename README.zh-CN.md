@@ -36,6 +36,8 @@ pi install npm:pi-model-system-prompt
 * deepseek-flash
 * glm-5.3-flash
 * glm-5.3
+* gpt-5.6（gpt-5.6-luna、gpt-5.6-sol、gpt-5.6-terra——codex 给这三个档同一份提示词，因此一个族文件）
+* gpt-6-luna、gpt-6-sol、gpt-6-astra、gpt-6.1-sol（codex 每一档各写一份，因此一档一个文件）
 * kimi（kimi-k3 及同族其它 id）
 
 ## 匹配与覆盖规则
@@ -64,6 +66,8 @@ deepseek来自于deepseek harness
 kimi来自于kimi code（整个模型族共用一份 harness，因此是一个族文件）
 
 claude来自于claude code（2.1.285，stable 通道；它自带完整版与较短版两套系统提示词，按模型选用，两套都照搬，每族一个文件）
+
+gpt来自于codex（`openai/codex`，tag `rust-v0.161.0`；某个 model id 用哪份文本，看 `codex-rs/models-manager/models.json` 里该 slug 的 `instructions_template` 字段，发布的 `@openai/codex@0.161.0` 二进制里是同一批字节。codex 给 gpt-5.6 全族一份提示词、给 gpt-6 每一档各写一份，所以 5.6 是单个族文件，gpt-6 各档各自一个文件；更晚的世代自带新文本，需要新文件）
 
 欢迎提交新的模型预置提示词
 
