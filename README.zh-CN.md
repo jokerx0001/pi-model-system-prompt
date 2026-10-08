@@ -22,9 +22,11 @@ pi install npm:pi-model-system-prompt
 装完重启 Pi。
 
 ## 快速开始
-安装完毕后自动生效。根据当前选择的model，只要~/.pi/agent/model-system-prompt/目录下存在与当前model同名的md文件，那么该文件内容就被当作此model的特定系统提示词，插件会将它加入pi agent的系统提示词中。
+安装完毕后自动生效。插件会选取 ~/.pi/agent/model-system-prompt/ 下**文件名是当前 model id 最长前缀**的那个 md 文件，把它的内容追加进 pi agent 的系统提示词。例如 model 为 glm-5.3-flash 时依次看 glm-5.3-flash.md、glm-5.3.md、glm.md，取存在且最长的那一个。不区分大小写；没有任何文件匹配的模型完全不受影响。
 
-需要自己写特定模型的系统提示词时，只需要在~/.pi/agent/model-system-prompt/目录下添加model同名md文件，并在文件中编写即可。打开pi时会自动加载。
+需要自己写特定模型的系统提示词时，只需要在 ~/.pi/agent/model-system-prompt/ 目录下添加与该 model 同名的 md 文件——或者用它所归属的同族名，此后以该名字开头的所有 model id 都会用它——并在文件中编写即可。打开 pi 时会自动加载。
+
+要关掉某一个模型，把它的文件清空。删除只有在没有更短的同名文件仍能匹配时才算关掉：删掉 glm-5.3.md 之后，glm-5.3 仍然吃 glm.md。
 
 插件提供优质的预置提示词。注意，由于开源模型存在不同精度和微调，所以预置提示词的调校均基于各自的官方模型，不对非官方模型效果做保证。鼓励用户根据自己使用的模型自己调控系统提示词。
 

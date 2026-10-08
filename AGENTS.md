@@ -4,11 +4,12 @@ A pi extension that appends a per-model system prompt, chosen by the active mode
 
 ## Layout
 
-- `index.ts` — the extension. Reads `~/.pi/agent/model-system-prompt/<modelId>.md` and appends it
-  to the system prompt on every run. No file means no injection.
+- `index.ts` — the extension. Resolves the active model id to the longest filename prefix in
+  `~/.pi/agent/model-system-prompt/` and appends that file to the system prompt on every run. No
+  matching file means no injection.
 - `install-presets.mjs` — the package's `postinstall` hook, and `npm run install-presets` for a dev
-  checkout. Copies `presets/*.md` into the user's prompt directory. Never overwrites; deleting a
-  preset is how you get rid of it.
+  checkout. Copies `presets/*.md` into the user's prompt directory. Never overwrites; emptying or
+  deleting the copy in your own directory is how you get rid of it.
 - `presets/` — ready-made prompts this project ships.
 - `test/` — `npm test`. The handler tests plus the seeding tests, one of which installs the packed
   package with the real `pi` CLI. Typed, and the stub context is derived from pi's own
@@ -18,7 +19,7 @@ A pi extension that appends a per-model system prompt, chosen by the active mode
 - `docs/agents/` — issue tracker, triage labels, domain doc conventions
 
 The extension only ever reads `~/.pi/agent/model-system-prompt/`. Once a preset is copied there it
-is indistinguishable from a file the user wrote: the user edits it, or deletes it to turn that
+is indistinguishable from a file the user wrote: the user edits it, or empties it to turn that
 model off, and the extension behaves the same either way. There is no manifest and no state file
 — what is on disk is the truth. Code and versioned prompt text live here; the *active* prompt for
 a given model is whatever the user has in their own directory.
@@ -35,8 +36,9 @@ pi installs the package with npm, and the package's `postinstall` hook copies `p
 `~/.pi/agent/model-system-prompt/`. The hook never overwrites a file that is already there, and npm
 runs it once per installed version and leaves an already-satisfied dependency alone — so a preset the
 user deleted is not put back by a later `pi install` of anything else, nor by re-running the same
-install. Deleting the file remains the only off switch, and there is no state file of ours; the
-install-once guarantee is npm's own.
+install. Emptying the file is the reliable off switch — deleting it works only while no shorter name
+still matches that model — and there is no state file of ours; the install-once guarantee is npm's
+own.
 
 Publishing is a manual one-time step: `npm publish`, targeting the public registry explicitly
 (this machine's npm registry is a mirror).

@@ -2,6 +2,10 @@
 
 **Status:** ready-for-agent
 
+**Resolution superseded:** the "model id verbatim, no family matching" decisions below are replaced
+by [`prefix-matching`](../prefix-matching/spec.md) — the active model takes the longest filename
+prefix of its id, compared case-insensitively.
+
 A pi extension that appends a per-model system prompt, chosen by the active model id.
 
 ## Problem Statement

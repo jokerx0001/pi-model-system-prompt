@@ -22,9 +22,11 @@ pi install npm:pi-model-system-prompt
 Restart Pi after installing.
 
 ## Quick start
-It takes effect as soon as it is installed. For whichever model is currently selected, if there is a Markdown file named after that model in `~/.pi/agent/model-system-prompt/`, the contents of that file are taken as that model's specific system prompt, and the extension adds it into the pi agent's system prompt.
+It takes effect as soon as it is installed. The extension picks the Markdown file in `~/.pi/agent/model-system-prompt/` whose name is the longest prefix of the current model id, and appends its contents to the pi agent's system prompt. For model `glm-5.3-flash` that is `glm-5.3-flash.md` if it exists, otherwise `glm-5.3.md`, otherwise `glm.md`. Case is ignored, and a model with no matching file is untouched.
 
-To write your own system prompt for a specific model, simply add a Markdown file named after that model in `~/.pi/agent/model-system-prompt/` and write the prompt in it. It is loaded automatically when you open pi.
+To write your own system prompt for a specific model, add a Markdown file in `~/.pi/agent/model-system-prompt/` named after that model — or after the family it belongs to, which then serves every model id starting with that name — and write the prompt in it. It is loaded automatically when you open pi.
+
+To turn one model off, empty its file. Deleting it works only while no shorter name still matches: delete `glm-5.3.md` and `glm-5.3` is still served by `glm.md`.
 
 The extension ships well-tuned preset prompts. Note that open-source models come in different quantizations and fine-tunes, so every preset prompt is tuned against its own official model, and no guarantee is made for unofficial builds. You are encouraged to tune the system prompt yourself to match the model you actually run.
 

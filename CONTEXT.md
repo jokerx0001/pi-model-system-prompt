@@ -12,9 +12,15 @@ user's prompt directory.
 _Avoid_: default prompt, fallback, template
 
 **Prompt file**:
-The `<modelId>.md` in the user's prompt directory that the extension reads for the active model.
-It is user data: the user edits it, or deletes it to turn that model off.
+The `.md` in the user's prompt directory that the active model resolves to.
+It is user data: the user edits it, or deletes or empties it to turn that model off — deleting only
+works when nothing shorter still matches that model.
 _Avoid_: preset, config
+
+**Family file**:
+A prompt file whose name is a prefix of the model id, so it serves that model when no longer name
+matches it.
+_Avoid_: default prompt, wildcard
 
 **System prompt**:
 The whole instruction text pi assembles for a run. The extension only ever appends to it.
