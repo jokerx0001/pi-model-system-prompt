@@ -14,7 +14,8 @@ _Avoid_: default prompt, fallback, template
 **Prompt file**:
 The `.md` in the user's prompt directory that the active model resolves to.
 It is user data: the user edits it, or deletes or empties it to turn that model off — deleting only
-works when nothing shorter still matches that model.
+works when nothing shorter still matches that model, and emptying also silences every model id it
+prefixes.
 _Avoid_: preset, config
 
 **Family file**:
