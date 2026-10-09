@@ -5,11 +5,15 @@ When you switch models, the system prompt specific to that model is appended to 
 [中文](README.zh-CN.md)
 
 ## Why this extension
-Large models need more than different capabilities — they need different harnesses. This shows up in agents such as Claude Code, Codex, and the pi agent, where each loads a system prompt tailored to a specific model at startup.
+Large models need more than different capabilities — they need different harnesses.
+
+The level of the harness matters enormously to how well a large model performs, which is by now a given across the industry.
+
+This shows up in agents such as Claude Code, Codex, and the pi agent, where each loads a system prompt tailored to a specific model at startup.
 
 In the course of using the pi agent we mix and match large models from several different sources. That kind of use is exactly the charm of a coding agent as free-form as pi.
 
-So when switching between models inside the pi agent, the ideal is that each model gets to use its own independent system prompt.
+So when switching between models inside the pi agent, the ideal is that each model gets to use its own independent system prompt — but the pi agent itself has no such capability.
 
 This extension provides exactly that.
 

@@ -5,11 +5,15 @@
 [English](README.md)
 
 ## 为什么需要这个插件
-不同的大模型，除了能力不同，其实还需要不同的harness方式。表现在agent中, 如claude code, codex, pi agent，那就是启动时针对特定模型加载的系统提示词。
+不同的大模型，除了能力不同，其实还需要不同的harness方式。
+
+Harness的水平，极大程度的影响大模型的发挥，这已经是业界公认的事实。
+
+表现在agent中, 如claude code, codex, pi agent，那就是启动时针对特定模型加载的系统提示词。
 
 在我们使用Pi agent的过程中，可能使用多个不同来源的大模型进行混用，这种用法也是Pi Agent这种高自由度coding agent的魅力。
 
-那么在Pi agent中切换不同模型时，最好能让不同模型能使用各自独立的系统提示词。
+那么在Pi agent中切换不同模型时，最好能让不同模型能使用各自独立的系统提示词，可是pi agent本身并没有这种能力。
 
 本插件提供此能力。
 
